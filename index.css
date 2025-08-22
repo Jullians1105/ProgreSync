@@ -1,3 +1,156 @@
+html, body {
+    height: 100%;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex: 1;
+}
+
+/* Estilo para el título */
+.titulo {
+    font-size: 2rem;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+/* Color negro para la parte "Proge" */
+.proge {
+    color: black;
+}
+
+/* Color naranja para la parte "Sync" */
+.sync {
+    color: #F28C28; /* Aquí va el código de color naranja que usas */
+}
+
+
+/* Barra Superior */
+.barra-superior {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 50px; /* Espaciado a los lados */
+    background-color: #ffffff; /* Fondo blanco */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra suave */
+}
+
+/* Logo */
+.Logo_ProgeSync img {
+    width: 150px;  /* Ajustar tamaño del logo */
+    border-radius: 50%
+}
+
+/* Título */
+.titulo {
+    font-size: 2.8rem;
+    font-weight: bold;
+    color: #000000;
+    cursor: pointer;
+}
+
+.titulo:hover {
+    color: #003366; /* Cambio de color al pasar el ratón */
+}
+
+/* Menú de opciones */
+.menu h2 {
+    font-size: 2rem;
+    cursor: pointer;
+    color: #000000;  /* Color del enlace */
+    margin-left: 20px;
+}
+
+.menu h2:hover {
+    text-decoration: underline; /* Subrayado al pasar el ratón */
+}
+
+.navegacion{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #003366; /* Fondo claro para la navegación */
+    padding: 10px 20px;
+}
+
+.navegacion h2{
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #ffffff;
+    margin: 0 15px;
+    cursor: pointer;
+}
+
+.navegacion h2:hover{
+    text-decoration: underline;
+    color: #f8f9fa;
+}
+
+.servicios {
+    padding: 50px;
+    background-color: #ffffff; 
+    text-align: center;
+}
+
+.servicios h2{
+    font-size: 2rem;
+    margin-bottom: 20px;
+    color: #333; /* Color del título */
+}
+
+.servicios p {
+    font-size: 1.2rem;
+    color: #666;
+    line-height: 1.6;
+    max-width: 800px; /* Ajustar según sea necesario */
+    margin: 0 auto; /* Centrar el texto */
+}
+
+.caracteristicas {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 40px 20px;
+    background-color: #ffffff; /* Fondo de la sección */
+    flex-wrap: wrap; /* Para que en pantallas pequeñas se acomoden en filas */
+}
+
+.caracteristicas h2 {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 20px;
+    font-size: 2rem;
+    color: #333; /* Color del título */
+}
+
+.card {
+    background: #f9f9f9; /* Fondo de cada card */
+    border-radius: 12px;
+    padding: 20px;
+    width: auto;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+    text-align: center;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+}
+
+.card h2 {
+    font-size: 1.3rem;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.card p {
+    font-size: 1rem;
+    color: #555;
+}
+
 .footer {
     background: #003366;
     color: white;
@@ -41,54 +194,26 @@
     font-size: 1.2rem;
 }
 
-
-.caracteristicas {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    padding: 40px 20px;
-    background-color: #ffffff; /* Fondo de la sección */
-    flex-wrap: wrap; /* Para que en pantallas pequeñas se acomoden en filas */
+/* Efecto Fade-In */
+.fade-in {
+    animation: fadeIn 1s ease-in-out;
 }
 
-.card {
-    background: #f9f9f9; /* Fondo de cada card */
-    border-radius: 12px;
-    padding: 20px;
-    width: 280px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    transition: transform 0.2s, box-shadow 0.2s;
-    text-align: center;
-}
-
-.card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-}
-
-.card h2 {
-    font-size: 1.3rem;
-    margin-bottom: 10px;
-    color: #333;
-}
-
-.card p {
-    font-size: 1rem;
-    color: #555;
-}
-
-html, body {
-    height: 100%;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-}
-
-main {
-    flex: 1;
+/* Definir la animación */
+@keyframes fadeIn {
+    from {
+        opacity: 0;  /* Comienza invisible */
+    }
+    to {
+        opacity: 1;  /* Termina completamente visible */
+    }
 }
 
 @media (max-width: 768px) {
+    .card{
+        width: 100%; /* Cada card ocupa todo el ancho en pantallas pequeñas */
+    }
+
     .footer {
         flex-direction: column;
         text-align: center;
