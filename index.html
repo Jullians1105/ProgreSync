@@ -1,27 +1,43 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inicio</title>
-    <link rel="icon" href="Imanenes/Logo_ProgeSync.png" type="image/png" />
+    <title>Inicio - ProgeSync</title>
+    <link rel="icon" href="Imagenes/Logo_ProgeSync.png" type="image/png" />
     <link rel="stylesheet" href="index.css">
 </head>
 <body>
-    <!-- Logo arriba izq -->
-    <div class="Logo_ProgeSync fade-in">
-        <img src="Imanenes/Logo_ProgeSync.png" alt="Logo ProgeSync">
-    </div>
-    
-    <section class="parte-superior fade-in">
-        <div class="barra-superior">
-            <h1 class="titulo fade-in" onclick="location.href='index.html'">ProgeSync</h1>
-            <div class="menu fade-in">
-                <h2 class="opcion1 fade-in" onclick="location.href='menu/iniciosesion/iniciosesion.html'">Iniciar Sesión</h2>
-                <h2 class="opcion2 fade-in" onclick="location.href='menu/registro/registro.html'">Registrarse</h2>
-            </div>
+
+    <header class="barra-superior fade-in">
+        <div class="logo">
+            <a href="index.html">
+                <img src="Imagenes/Logo_ProgeSync.png" alt="Logo ProgeSync - Plataforma de seguimiento">
+            </a>
         </div>
-    </section>
+        <h1 class="titulo fade-in">
+            <a href="index.html">ProgeSync</a>
+        </h1>
+        <div class="menu fade-in">
+            <a class="opcion-inicio-sesion fade-in" href="menu/iniciosesion/iniciosesion.html">Iniciar Sesión</a>
+        </div>
+    </header>
+
+    <!--Barra de navegación -->
+    <nav class="navegacion fade-in">
+        <a href="index.html" class="nav-item fade-in">Inicio</a>
+        <a href="Menu/navegacion/entregas/entregas.html" class="nav-item fade-in">Entregas</a>
+        <a href="Menu/navegacion/seguimiento/seguimiento.html" class="nav-item fade-in">Seguimiento</a>
+        <a href="Menu/navegacion/notificaciones/notificaciones.html" class="nav-item fade-in">Notificaciones</a>
+        <a href="Menu/navegacion/ayuda/ayuda.html" class="nav-item fade-in">Ayuda</a>
+    </nav>
+
+    <!-- Contenido principal -->
+    <main>
+        <div class="fondo fade-in">
+            <img src="Imagenes/Fondomain.png" alt="Fondo principal con estudiantes y código de programación">
+        </div>
+    </main>
 
 </body>
 </html>
