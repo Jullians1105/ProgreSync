@@ -1,12 +1,28 @@
 html, body {
     height: 100%;
     margin: 0;
-    display: flex;
-    flex-direction: column;
+    padding: 0; /* Eliminamos el padding extra */
+    box-sizing: border-box; /* Asegura que el padding y los bordes no afecten el ancho total */
+    overflow-x: hidden; /* Elimina cualquier desbordamiento horizontal */
 }
 
-main {
-    flex: 1;
+/* Sección Fondo Principal */
+.fondo {
+    position: relative;
+    width: 100%; /* Asegura que ocupe todo el ancho de la pantalla */
+    height: 100vh; /* Ocupa el alto completo de la ventana */
+    overflow: hidden; /* Evita el desbordamiento de la imagen */
+}
+
+/* Imagen de Fondo */
+.fondo img {
+    position: absolute; /* Hace que la imagen se quede fija */
+    top: 0;
+    left: 0;
+    width: 100%; /* La imagen ocupará todo el ancho disponible */
+    height: 100%; /* Asegura que ocupe todo el alto disponible */
+    object-fit: cover; /* Asegura que la imagen se ajuste sin distorsionarse */
+    object-position: center; /* Centra la imagen */
 }
 
 /* Estilo para el título */
@@ -26,7 +42,6 @@ main {
     color: #F28C28; /* Aquí va el código de color naranja que usas */
 }
 
-
 /* Barra Superior */
 .barra-superior {
     display: flex;
@@ -39,8 +54,8 @@ main {
 
 /* Logo */
 .Logo_ProgeSync img {
-    width: 150px;  /* Ajustar tamaño del logo */
-    border-radius: 50%
+    width: 120px;  /* Ajustar tamaño del logo */
+    border-radius: 50%;
 }
 
 /* Título */
@@ -109,12 +124,13 @@ main {
 }
 
 .caracteristicas {
-    display: flex;
-    justify-content: space-between;
-    gap: 20px;
+    display:flex; /* Usamos Flexbox para distribuir las tarjetas */
+    flex-wrap: wrap; /* Para que las tarjetas se acomoden en filas si es necesario */
+    justify-content: center; /* Espaciado entre las tarjetas */
+    gap: 5px; /* Espaciado entre las tarjetas */
     padding: 40px 20px;
-    background-color: #ffffff; /* Fondo de la sección */
-    flex-wrap: wrap; /* Para que en pantallas pequeñas se acomoden en filas */
+    background-color: #ffffff;
+    text-align: center;
 }
 
 .caracteristicas h2 {
@@ -122,17 +138,18 @@ main {
     text-align: center;
     margin-bottom: 20px;
     font-size: 2rem;
-    color: #333; /* Color del título */
+    color: #333;
 }
 
 .card {
-    background: #f9f9f9; /* Fondo de cada card */
+    background: #f9f9f9;
     border-radius: 12px;
     padding: 20px;
-    width: auto;
+    width: 280px; /* Tamaño fijo para las tarjetas */
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     transition: transform 0.2s, box-shadow 0.2s;
     text-align: center;
+    margin: 0;
 }
 
 .card:hover {
@@ -151,6 +168,33 @@ main {
     color: #555;
 }
 
+.quienes_somos {
+    padding: 50px 20px;
+    background-color: #f8f9fa;
+    text-align: center;
+}
+
+.texto_quienes_somos img{
+    width: 120px;
+    height: auto;
+    border-radius: 50%;
+}
+
+.texto_quienes_somos h2 {
+    font-size: 2.5rem;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.texto_quienes_somos p {
+    font-size: 1.2rem;
+    color: #666;
+    line-height: 1.6;
+    max-width: 800px; /* Ajustar según sea necesario */
+    margin: 0 auto; /* Centrar el texto */
+}
+
+/* Footer */
 .footer {
     background: #003366;
     color: white;
@@ -160,9 +204,11 @@ main {
     align-items: center;
     gap: 40px; /* Espacio entre logo y contactos */
     width: 100%;
-    margin-top: auto; /* 🔥 Esto lo pega abajo */
+    margin-top: auto; /* Esto lo pega abajo */
+    box-sizing: border-box; /* Evita el desbordamiento */
 }
 
+/* Footer logo */
 .footer-logo{
     background: #FF8D00;
     border-radius: 50%;
@@ -174,20 +220,23 @@ main {
 }
 
 .footer-logo img {
-    width: 70%;
+    width: 120%;
     height: auto;
+    border-radius: 50%;
 }
 
 .footer-contacto h3 {
     margin-bottom: 15px;
     font-size: 1.3rem;
 }
+
 .footer-contacto p {
     margin: 8px 0px;
     font-size: 1.2rem;
     display: flex;
     align-items: center;
 }
+
 .footer-i {
     margin-right: 10px;
     color:#ffcc00;
@@ -210,8 +259,13 @@ main {
 }
 
 @media (max-width: 768px) {
-    .card{
-        width: 100%; /* Cada card ocupa todo el ancho en pantallas pequeñas */
+    .caracteristicas {
+        flex-direction: column; /* Las tarjetas se apilan verticalmente en pantallas pequeñas */
+        align-items: center; /* Centra las tarjetas */
+    }
+
+    .card {
+        width: 100%; /* Cada tarjeta ocupa todo el ancho disponible */
     }
 
     .footer {
