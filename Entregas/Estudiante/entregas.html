@@ -9,17 +9,16 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="./entregas.css">
 </head>
-<body class="bg-dark text-light">
-
-  <!-- 🔹 Navbar superior con logo + texto -->
-  <nav class="navbar navbar-dark bg-dark shadow-sm px-3">
+<body class="bg-light text-dark">
+  <!-- 🔹 Navbar superior con fondo blanco -->
+  <nav class="navbar navbar-light bg-white shadow-sm px-3 border-bottom">
     <div class="d-flex align-items-center">
-      <!-- Logo: ajusta la ruta según la ubicación del HTML -->
+      <!-- Logo: ajusta la ruta según la ubicación -->
       <img src="../../Imagenes/Logo_ProgeSync.png" alt="Logo ProgeSync" 
            style="height:40px; width:auto; margin-right:10px;">
-      <!-- Texto con colores: "Proge" negro, "Sync" naranja -->
+      <!-- Texto ProgeSync -->
       <span style="font-size:1.5rem; font-weight:bold;">
-        <span style="color:white;">Proge</span><span style="color:orange;">Sync</span>
+        <span style="color:black;">Proge</span><span style="color:orange;">Sync</span>
       </span>
     </div>
   </nav>
@@ -41,8 +40,8 @@
 
     <!-- Tabla donde se listan las entregas del estudiante -->
     <!-- Cada fila se llenará dinámicamente con JS -->
-    <table class="table table-dark table-hover">
-      <thead>
+    <table class="table table-striped">
+      <thead class="table-dark">
         <tr>
           <th>Título</th>
           <th>Descripción</th>
