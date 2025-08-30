@@ -1,1 +1,5 @@
+/* Yo defino estilos básicos de estados */
+.badge-en_revision { background: #ffc107; color: #000; }
+.badge-aprobado   { background: #198754; }
+.badge-rechazado  { background: #dc3545; }
 
