@@ -10,10 +10,27 @@
   <link rel="stylesheet" href="./entregas.css">
 </head>
 <body class="bg-dark text-light">
+
+  <!-- 🔹 Navbar superior con logo + texto -->
+  <nav class="navbar navbar-dark bg-dark shadow-sm px-3">
+    <div class="d-flex align-items-center">
+      <!-- Logo: ajusta la ruta según la ubicación del HTML -->
+      <img src="../../Imagenes/Logo_ProgeSync.png" alt="Logo ProgeSync" 
+           style="height:40px; width:auto; margin-right:10px;">
+      <!-- Texto con colores: "Proge" negro, "Sync" naranja -->
+      <span style="font-size:1.5rem; font-weight:bold;">
+        <span style="color:white;">Proge</span><span style="color:orange;">Sync</span>
+      </span>
+    </div>
+  </nav>
+  <!-- 🔹 Fin navbar -->
+
+  <!-- Contenido principal -->
   <main class="container py-4">
-    <h1 class="h3">Mis Entregas — Estudiante</h1>
+    <h1 class="h3 mb-4">Mis Entregas — Estudiante</h1>
 
     <!-- Formulario para subir archivo -->
+    <!-- Aquí el estudiante coloca título, descripción y selecciona un archivo -->
     <form id="form-entrega" class="my-3">
       <input id="titulo" class="form-control mb-2" placeholder="Título" required>
       <textarea id="descripcion" class="form-control mb-2" placeholder="Descripción"></textarea>
@@ -22,7 +39,8 @@
       <span id="msg" class="ms-2"></span>
     </form>
 
-    <!-- Tabla de entregas -->
+    <!-- Tabla donde se listan las entregas del estudiante -->
+    <!-- Cada fila se llenará dinámicamente con JS -->
     <table class="table table-dark table-hover">
       <thead>
         <tr>
@@ -34,16 +52,18 @@
         </tr>
       </thead>
       <tbody id="tbody-entregas">
-        <!-- JS llenará aquí -->
+        <!-- Aquí JS insertará las entregas -->
       </tbody>
     </table>
   </main>
 
+  <!-- 🔹 Validación de rol: solo estudiantes pueden entrar -->
   <script type="module">
     import { requireRole } from "../guard.js";
     window.SESION = requireRole(['estudiante']);
   </script>
+
+  <!-- 🔹 Lógica de esta vista -->
   <script src="./entregas.js"></script>
 </body>
 </html>
-
