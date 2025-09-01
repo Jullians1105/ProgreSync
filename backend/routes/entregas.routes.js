@@ -1,12 +1,16 @@
 // backend/routes/entregas.routes.js
-
-// 1. Importo express para definir un enrutador.
 import { Router } from "express";
-
 const router = Router();
 
-// 2. Ruta de prueba: lista de entregas pendientes (MOCK).
-//    Así el frontend del docente puede mostrar datos de ejemplo.
+// Log para verificar que ESTE archivo sí se está cargando
+console.log("✅ entregas.routes.js cargado");
+
+// Ruta de diagnóstico: si esto responde, el router está montado correctamente.
+router.get("/__ping", (req, res) => {
+  res.json({ ok: true, from: "entregas.routes.js" });
+});
+
+// Ruta MOCK para el Docente: pendientes
 router.get("/pendientes", (req, res) => {
   res.json([
     {
@@ -15,7 +19,7 @@ router.get("/pendientes", (req, res) => {
       descripcion: "Entrega pendiente de revisión",
       archivo: "#",
       estado: "en_revision",
-      fecha: new Date().toISOString()
+      fecha: new Date().toISOString(),
     },
     {
       id: 2,
@@ -23,11 +27,9 @@ router.get("/pendientes", (req, res) => {
       descripcion: "Documento con actividades de la semana",
       archivo: "#",
       estado: "en_revision",
-      fecha: new Date().toISOString()
-    }
+      fecha: new Date().toISOString(),
+    },
   ]);
 });
 
-// 3. Exporto el router para que app.js lo pueda usar.
 export default router;
-
