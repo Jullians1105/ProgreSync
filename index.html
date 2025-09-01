@@ -24,7 +24,17 @@
 
     <nav class="navegacion fade-in">
         <h2 class="navegacion1 fade-in" onclick="location.href='index.html'">Inicio</h2>
-        <h2 class="navegacion2 fade-in" onclick="location.href='Entregas/entregas.html'">Entregas</h2>
+
+        <!-- Entregas: mantenemos el onClick original y añadimos accesibilidad de teclado -->
+        <h2
+            id="link-entregas"
+            class="navegacion2 fade-in"
+            role="button"
+            tabindex="0"
+            onclick="location.href='Entregas/entregas.html'">
+            Entregas
+        </h2>
+
         <h2 class="navegacion3 fade-in" onclick="location.href='Seguimiento/seguimiento.html'">Seguimiento</h2>
         <h2 class="navegacion3 fade-in" onclick="location.href='Notificacion/notificaciones.html'">Notificaciones</h2>
         <h2 class="navegacion3 fade-in" onclick="location.href='Ayuda/ayuda.html'">Ayuda</h2>
@@ -44,7 +54,7 @@
         </p>
     </section>
 
-<!-- poner un divisor de color principal para que no se vea tan mal al seguir abajo -->
+    <!-- poner un divisor de color principal para que no se vea tan mal al seguir abajo -->
 
     <section class="caracteristicas fade-in">
         <h2>Características Principales</h2>
@@ -80,17 +90,33 @@
         </div>
     </section>
 
-<footer class="footer fade-in">
-    <div class="footer-logo fade-in">
-        <img src="Imagenes/Logo_ProgeSync.png" alt="Logo ProgeSync">
-    </div>
+    <footer class="footer fade-in">
+        <div class="footer-logo fade-in">
+            <img src="Imagenes/Logo_ProgeSync.png" alt="Logo ProgeSync">
+        </div>
 
-    <div class="footer-contacto fade-in">
-        <h3><i class="fas fa-mobile-alt"></i> Contáctanos</h3>
-        <p><i class="fas fa-phone"></i> 3208673417</p>
-        <p><i class="fas fa-phone"></i> 3112414027</p>
-        <p><i class="fas fa-phone"></i> 3167117358</p>
-    </div>
-</footer>
+        <div class="footer-contacto fade-in">
+            <h3><i class="fas fa-mobile-alt"></i> Contáctanos</h3>
+            <p><i class="fas fa-phone"></i> 3208673417</p>
+            <p><i class="fas fa-phone"></i> 3112414027</p>
+            <p><i class="fas fa-phone"></i> 3167117358</p>
+        </div>
+    </footer>
+
+    <!-- JS mínimo para accesibilidad del enlace de Entregas sin tocar el resto -->
+    <script>
+      (function () {
+        const link = document.getElementById('link-entregas');
+        if (!link) return;
+
+        link.addEventListener('keydown', (ev) => {
+          // Permite activar con Enter o Space
+          if (ev.key === 'Enter' || ev.key === ' ') {
+            ev.preventDefault();
+            window.location.href = 'Entregas/entregas.html';
+          }
+        });
+      })();
+    </script>
 </body>
 </html>
