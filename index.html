@@ -25,13 +25,13 @@
     <nav class="navegacion fade-in">
         <h2 class="navegacion1 fade-in" onclick="location.href='index.html'">Inicio</h2>
 
-        <!-- Entregas: mantenemos el onClick original y añadimos accesibilidad de teclado -->
+        <!-- Entregas: corregida la ruta para que apunte a Estudiante -->
         <h2
             id="link-entregas"
             class="navegacion2 fade-in"
             role="button"
             tabindex="0"
-            onclick="location.href='Entregas/entregas.html'">
+            onclick="location.href='Entregas/Estudiante/entregas.html'">
             Entregas
         </h2>
 
@@ -113,7 +113,7 @@
           // Permite activar con Enter o Space
           if (ev.key === 'Enter' || ev.key === ' ') {
             ev.preventDefault();
-            window.location.href = 'Entregas/entregas.html';
+            window.location.href = 'Entregas/Estudiante/entregas.html';
           }
         });
       })();
