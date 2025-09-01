@@ -30,12 +30,54 @@ app.get("/", (req, res) => {
 // Así puedo organizar mejor las URL y tener mi API más clara.
 app.use("/api/entregas", entregasRoutes);
 
+
+
+// ─────────── 🔧 ENDPOINTS MOCK PARA PROBAR FRONTEND ───────────
+
+// Yo agrego un endpoint que devuelve una lista fija de entregas pendientes.
+// Esto me permite probar el frontend del docente aunque aún no tenga conexión a la base de datos.
+app.get("/api/entregas/pendientes", (req, res) => {
+  res.json([
+    {
+      id: 1,
+      titulo: "Informe 1 (demo)",
+      descripcion: "Entrega de prueba para revisar",
+      archivo: "#", // Aquí luego irá el link real al archivo
+      estado: "en_revision",
+      fecha: new Date().toISOString()
+    },
+    {
+      id: 2,
+      titulo: "Informe 2 (demo)",
+      descripcion: "Otra entrega pendiente de revisión",
+      archivo: "#",
+      estado: "en_revision",
+      fecha: new Date().toISOString()
+    }
+  ]);
+});
+
+// Yo agrego un endpoint que simula aprobar o rechazar una entrega.
+// Por ahora solo imprime en consola la acción y responde con ok:true.
+app.post("/api/entregas/:id/revision", (req, res) => {
+  console.log("Revisión recibida:", req.params.id, req.body);
+  res.json({ ok: true, mocked: true });
+});
+
+// ─────────── 🔧 FIN ENDPOINTS MOCK ───────────
+
+
+
 // Finalmente, defino el puerto en el que se va a ejecutar el servidor.
 // Si existe una variable de entorno PORT la uso, si no, por defecto será 8000.
 const PORT = process.env.PORT || 8000;
 
 // Pongo el servidor a escuchar en el puerto definido.
 // Cuando arranque, muestro un mensaje en consola para confirmar que está corriendo.
+app.listen(PORT, () => {
+  console.log(`Servidor escuchando en http://localhost:${PORT}`);
+});
+
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en http://localhost:${PORT}`);
 });
