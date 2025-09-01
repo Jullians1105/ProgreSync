@@ -2,10 +2,10 @@
 import { Router } from "express";
 const router = Router();
 
-// Log para verificar que ESTE archivo sí se está cargando
+// Log para confirmar que este archivo sí se llegó a cargar
 console.log("✅ entregas.routes.js cargado");
 
-// Ruta de diagnóstico: si esto responde, el router está montado correctamente.
+// Ruta de diagnóstico para verificar montaje del router
 router.get("/__ping", (req, res) => {
   res.json({ ok: true, from: "entregas.routes.js" });
 });
