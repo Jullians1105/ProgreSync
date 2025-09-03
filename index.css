@@ -12,7 +12,6 @@ html, body {
 
 main {
     margin-top: 180px; /* Espacio para la barra fija */
-}
 
     margin-top: 160px; /* Espacio para la barra fija */
 }
@@ -159,7 +158,6 @@ main {
     right: 50px;
     top: 50%;
     transform: translateY(-50%);
-}
 }
 
 .header-top {
