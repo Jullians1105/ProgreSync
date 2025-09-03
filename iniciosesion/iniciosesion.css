@@ -55,10 +55,16 @@
 
     .titulo {
         text-align: center;
-        font-size: 32px;
+        font-size: 2.8rem;
         font-weight: bold;
         margin-bottom: 20px;
-    }      
+        color: #000000;
+        cursor: pointer;
+    }
+
+    .titulo:hover {
+        color: #003366; /* Cambio de color al pasar el ratón */
+    }
 
     .contenido form .form-content{
         width: 100%;
