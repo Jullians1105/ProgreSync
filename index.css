@@ -6,23 +6,15 @@ html, body {
     overflow-x: hidden; /* Elimina cualquier desbordamiento horizontal */
 }
 
-/* Sección Fondo Principal */
-.fondo {
-    position: relative;
-    width: 100%; /* Asegura que ocupe todo el ancho de la pantalla */
-    height: 100vh; /* Ocupa el alto completo de la ventana */
-    overflow: hidden; /* Evita el desbordamiento de la imagen */
+main {
+    margin-top: 160px; /* Espacio para la barra fija */
 }
 
-/* Imagen de Fondo */
-.fondo img {
-    position: absolute; /* Hace que la imagen se quede fija */
-    top: 0;
-    left: 0;
-    width: 100%; /* La imagen ocupará todo el ancho disponible */
-    height: 100%; /* Asegura que ocupe todo el alto disponible */
-    object-fit: cover; /* Asegura que la imagen se ajuste sin distorsionarse */
-    object-position: center; /* Centra la imagen */
+.imagen1 img {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+    height: auto;
 }
 
 /* Color negro para la parte "Proge" */
@@ -33,16 +25,6 @@ html, body {
 /* Color naranja para la parte "Sync" */
 .sync {
     color: #F28C28; /* Aquí va el código de color naranja que usas */
-}
-
-/* Barra Superior */
-.barra-superior {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 20px 50px; /* Espaciado a los lados */
-    background-color: #ffffff; /* Fondo blanco */
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra suave */
 }
 
 /* Logo */
@@ -63,35 +45,48 @@ html, body {
     color: #003366; /* Cambio de color al pasar el ratón */
 }
 
-/* Menú de opciones */
-.menu h2 {
+.barra-superior {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    padding: 20px 50px; /* Espaciado a los lados */
+    background-color: #ffffff; /* Fondo blanco */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra suave */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1000;
+}
+
+.menu-toggle {
+    display: none;
+    background: none;
+    border: none;
     font-size: 2rem;
     cursor: pointer;
-    color: #000000;  /* Color del enlace */
-    margin-left: 20px;
 }
 
-.menu h2:hover {
-    text-decoration: underline; /* Subrayado al pasar el ratón */
-}
-
-.navegacion{
+.navegacion {
     display: flex;
     justify-content: center;
     align-items: center;
-    background-color: #003366; /* Fondo claro para la navegación */
+    background-color: #003366; /* Fondo azul para la navegación */
+    width: 100%;
     padding: 10px 20px;
 }
 
-.navegacion h2{
+.nav-link {
     font-size: 1.2rem;
     font-weight: bold;
     color: #ffffff;
     margin: 0 15px;
-    cursor: pointer;
+    text-decoration: none;
 }
 
-.navegacion h2:hover{
+.nav-link:hover,
+.nav-link:focus {
     text-decoration: underline;
     color: #f8f9fa;
 }
@@ -116,13 +111,15 @@ html, body {
     margin: 0 auto; /* Centrar el texto */
 }
 
+
 .caracteristicas {
     display:flex; /* Usamos Flexbox para distribuir las tarjetas */
     flex-wrap: wrap; /* Para que las tarjetas se acomoden en filas si es necesario */
     justify-content: center; /* Espaciado entre las tarjetas */
     gap: 5px; /* Espaciado entre las tarjetas */
     padding: 40px 20px;
-    background-color: #ffffff;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(5px);
     text-align: center;
 }
 
@@ -163,7 +160,8 @@ html, body {
 
 .quienes_somos {
     padding: 50px 20px;
-    background-color: #f8f9fa;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(5px);
     text-align: center;
 }
 
@@ -230,6 +228,24 @@ html, body {
     align-items: center;
 }
 
+.contact-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.copy-btn {
+    background: none;
+    border: none;
+    color: #ffffff;
+    cursor: pointer;
+}
+
+.copy-btn:hover,
+.copy-btn:focus {
+    color: #ffcc00;
+}
+
 .footer-i {
     margin-right: 10px;
     color:#ffcc00;
@@ -251,7 +267,36 @@ html, body {
     }
 }
 
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
 @media (max-width: 768px) {
+    .menu-toggle {
+        display: block;
+        color: #003366;
+    }
+
+    .navegacion {
+        display: none;
+        flex-direction: column;
+        align-items: flex-start;
+        width: 100%;
+    }
+
+    .navegacion.open {
+        animation: fadeIn 0.3s ease-in-out;
+    }
+
+    .navegacion.closing {
+        animation: fadeOut 0.3s ease-in-out forwards;
+    }
+
     .caracteristicas {
         flex-direction: column; /* Las tarjetas se apilan verticalmente en pantallas pequeñas */
         align-items: center; /* Centra las tarjetas */
