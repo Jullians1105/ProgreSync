@@ -47,8 +47,13 @@ main {
 
 .barra-superior {
     display: flex;
+
     flex-direction: column;
     align-items: center;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    padding: 20px 50px; /* Espaciado a los lados */
     background-color: #ffffff; /* Fondo blanco */
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra suave */
     position: fixed;
@@ -57,6 +62,7 @@ main {
     width: 100%;
     z-index: 1000;
 }
+
 
 .header-top {
     width: 100%;
@@ -81,6 +87,7 @@ main {
     top: 50%;
     transform: translateY(-50%);
 }
+
 
 .menu-toggle {
     display: none;
@@ -304,6 +311,7 @@ main {
         color: #003366;
     }
 
+
     .header-top {
         padding: 20px;
     }
@@ -315,6 +323,7 @@ main {
     .header-top .menu-toggle {
         right: 20px;
     }
+
 
     .navegacion {
         display: none;
