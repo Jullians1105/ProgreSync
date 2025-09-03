@@ -18,6 +18,7 @@ main {
 
 main {
     margin-top: 160px; /* Espacio para la barra fija */
+
 }
 
 .imagen1 img {
@@ -62,6 +63,21 @@ main {
 .titulo-link:focus {
     outline: 2px solid #ffcc00;
     outline-offset: 4px;
+}
+
+.barra-superior {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: #ffffff; /* Fondo blanco */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra suave */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0; /* Evita que el contenedor sobrepase el ancho y cubra la barra de desplazamiento */
+    z-index: 1000;
+}
+
 }
 
 
@@ -183,7 +199,6 @@ main {
     top: 50%;
     transform: translateY(-50%);
 }
-
 
 .menu-toggle {
     display: none;
@@ -425,6 +440,7 @@ main {
     .header-top .menu-toggle {
         right: 20px;
     }
+
     .navegacion {
         display: none;
         flex-direction: column;
