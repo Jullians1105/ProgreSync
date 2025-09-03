@@ -25,13 +25,6 @@ html, body {
     object-position: center; /* Centra la imagen */
 }
 
-/* Estilo para el título */
-.titulo {
-    font-size: 2rem;
-    font-weight: bold;
-    cursor: pointer;
-}
-
 /* Color negro para la parte "Proge" */
 .proge {
     color: black;
@@ -58,7 +51,7 @@ html, body {
     border-radius: 50%;
 }
 
-/* Título */
+/* Estilo para el título */
 .titulo {
     font-size: 2.8rem;
     font-weight: bold;
