@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,38 +10,30 @@
 </head>
 <body>    
     <header class="barra-superior fade-in">
-        <div class="Logo_ProgeSync fade-in">
-            <img src="Imagenes/Logo_ProgeSync.png" alt="Logo ProgeSync">
+        <div class="header-top">
+            <div class="Logo_ProgeSync fade-in">
+                <img src="Imagenes/Logo_ProgeSync.png" alt="Logo ProgeSync">
+            </div>
+            <h1 class="titulo fade-in" onclick="location.href='index.html'">
+                <span class="proge">Proge</span><span class="sync">Sync</span>
+            </h1>
+
+            <button class="menu-toggle" aria-label="Abrir menú">
+                <i class="fas fa-bars"></i>
+            </button>
         </div>
-        <h1 class="titulo fade-in" onclick="location.href='index.html'">
-            <span class="proge">Proge</span><span class="sync">Sync</span>
-        </h1>
 
-        <div class="menu fade-in">
-            <h2 class="opcion1 fade-in" onclick="location.href='iniciosesion/iniciosesion.html'">Iniciar Sesión</h2>
-        </div>    
-        </header>
-
-    <nav class="navegacion fade-in">
-        <h2 class="navegacion1 fade-in" onclick="location.href='index.html'">Inicio</h2>
-
-        <!-- Entregas: corregida la ruta para que apunte a Estudiante -->
-        <h2
-            id="link-entregas"
-            class="navegacion2 fade-in"
-            role="button"
-            tabindex="0"
-            onclick="location.href='Entregas/Estudiante/entregas.html'">
-            Entregas
-        </h2>
-
-        <h2 class="navegacion3 fade-in" onclick="location.href='Seguimiento/seguimiento.html'">Seguimiento</h2>
-        <h2 class="navegacion3 fade-in" onclick="location.href='Notificacion/notificaciones.html'">Notificaciones</h2>
-        <h2 class="navegacion3 fade-in" onclick="location.href='Ayuda/ayuda.html'">Ayuda</h2>
-    </nav>
+        <nav class="navegacion fade-in">
+            <a class="nav-link" href="index.html">Inicio</a>
+            <a class="nav-link" href="Entregas/Estudiante/entregas.html">Entregas</a>
+            <a class="nav-link" href="Seguimiento/seguimiento.html">Seguimiento</a>
+            <a class="nav-link" href="Notificacion/notificaciones.html">Notificaciones</a>
+            <a class="nav-link" href="Ayuda/ayuda.html">Ayuda</a>
+            <a class="nav-link" href="iniciosesion/iniciosesion.html">Iniciar Sesión</a>
+        </nav>
+    </header>
 
     <main>
-        <!--<div class="fondo fade-in"> cambiarlo-->
         <div class="imagen1 fade-in">
             <img src="Imagenes/Fondomain.png" alt="Fondo Principal">
         </div>
@@ -97,26 +89,13 @@
 
         <div class="footer-contacto fade-in">
             <h3><i class="fas fa-mobile-alt"></i> Contáctanos</h3>
-            <p><i class="fas fa-phone"></i> 3208673417</p>
-            <p><i class="fas fa-phone"></i> 3112414027</p>
-            <p><i class="fas fa-phone"></i> 3167117358</p>
+            <p class="contact-item"><span>3208673417</span><button class="copy-btn" data-copy="3208673417"><i class="fas fa-copy"></i></button></p>
+            <p class="contact-item"><span>3112414027</span><button class="copy-btn" data-copy="3112414027"><i class="fas fa-copy"></i></button></p>
+            <p class="contact-item"><span>3167117358</span><button class="copy-btn" data-copy="3167117358"><i class="fas fa-copy"></i></button></p>
+            <p class="contact-item"><span>contacto.progresync@gmail.com</span><button class="copy-btn" data-copy="contacto.progresync@gmail.com"><i class="fas fa-copy"></i></button></p>
         </div>
     </footer>
 
-    <!-- JS mínimo para accesibilidad del enlace de Entregas sin tocar el resto -->
-    <script>
-      (function () {
-        const link = document.getElementById('link-entregas');
-        if (!link) return;
-
-        link.addEventListener('keydown', (ev) => {
-          // Permite activar con Enter o Space
-          if (ev.key === 'Enter' || ev.key === ' ') {
-            ev.preventDefault();
-            window.location.href = 'Entregas/Estudiante/entregas.html';
-          }
-        });
-      })();
-    </script>
+    <script src="index.js"></script>
 </body>
 </html>
