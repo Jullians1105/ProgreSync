@@ -1,3 +1,5 @@
+// backend/app.js
+
 // Express: librería que utilizo para crear el servidor en Node.js y definir las rutas HTTP.
 import express from "express";
 
@@ -24,12 +26,14 @@ import { pool } from "./services/db.js";
 const app = express();
 
 // Configuración de CORS.
-// Con esto indico desde qué origen se pueden hacer peticiones a mi servidor.
-// "credentials: true" permite que la cookie de sesión viaje en las solicitudes.
+// Aquí debo poner la URL del FRONTEND (no la del backend).
+// Ejemplos:
+// - Vite/React: "http://localhost:5173"
+// - Live Server: "http://127.0.0.1:5500"
 app.use(
   cors({
-    origin: "http://localhost:8000", // aquí pongo la URL del frontend
-    credentials: true,
+    origin: "http://localhost:5173",
+    credentials: true, // permite que la cookie de sesión viaje en las solicitudes
   })
 );
 
@@ -42,17 +46,30 @@ app.use(express.json());
 // La cookie expira en 1 hora.
 app.use(
   session({
-    secret: "clave_de_sesion_proyecto", 
+    secret: "clave_de_sesion_proyecto",
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true, // la cookie no puede ser leída por JavaScript en el navegador
       maxAge: 1000 * 60 * 60, // 1 hora
-      sameSite: "lax", // controla cómo viaja la cookie entre dominios
-      secure: false, // en local lo dejo en false, en producción sería true con HTTPS
+      sameSite: "lax",        // controla cómo viaja la cookie entre dominios
+      secure: false,          // en producción debería ser true con HTTPS
     },
   })
 );
+
+// Pequeño middleware para exigir rol en rutas protegidas.
+// Verifica que exista sesión y que el rol del usuario esté en la lista permitida.
+function requireRole(...rolesPermitidos) {
+  return (req, res, next) => {
+    const user = req.session?.user;
+    if (!user) return res.status(401).json({ error: "No autenticado" });
+    if (!rolesPermitidos.includes(user.role)) {
+      return res.status(403).json({ error: "Sin permisos" });
+    }
+    next();
+  };
+}
 
 // Ruta raíz para comprobar rápidamente que el servidor está activo.
 app.get("/", (req, res) => {
@@ -76,7 +93,6 @@ app.post("/login", async (req, res) => {
       "SELECT id, email, password_hash, rol FROM usuarios WHERE email = ? LIMIT 1",
       [email]
     );
-
     if (!user) return res.status(401).json({ error: "Credenciales inválidas" });
 
     // Comparo la contraseña que ingresó el usuario con el hash almacenado en la base de datos.
@@ -101,6 +117,47 @@ app.get("/me", (req, res) => {
 // POST /logout: elimina la sesión y borra la cookie del navegador.
 app.post("/logout", (req, res) => {
   req.session.destroy(() => res.json({ ok: true }));
+});
+
+// ------------------------------------
+// Creación de usuarios por parte de un admin
+// ------------------------------------
+// POST /usuarios: crea cuentas nuevas (docente, estudiante, admin, empresa) con correo y contraseña.
+// Solo permite el acceso a usuarios con rol 'admin'.
+app.post("/usuarios", requireRole("admin"), async (req, res) => {
+  try {
+    const { nombre, email, password, rol } = req.body || {};
+
+    // Validaciones mínimas de entrada
+    if (!email || !password || !rol) {
+      return res.status(400).json({ error: "email, password y rol son obligatorios" });
+    }
+
+    // Ajusta esta lista a los valores permitidos en tu ENUM de MySQL.
+    const rolesValidos = ["estudiante", "docente", "admin", "empresa"];
+    if (!rolesValidos.includes(rol)) {
+      return res.status(400).json({ error: "rol inválido" });
+    }
+
+    // Rechazar correos duplicados
+    const [existe] = await pool.query(
+      "SELECT id FROM usuarios WHERE email = ? LIMIT 1",
+      [email]
+    );
+    if (existe.length) return res.status(409).json({ error: "El email ya está registrado" });
+
+    // Generar hash de la contraseña y guardar
+    const hash = await bcrypt.hash(password, 12);
+    await pool.query(
+      "INSERT INTO usuarios (nombre, email, rol, password_hash) VALUES (?,?,?,?)",
+      [nombre || null, email, rol, hash]
+    );
+
+    return res.status(201).json({ ok: true });
+  } catch (err) {
+    console.error("Error creando usuario:", err);
+    return res.status(500).json({ error: "No se pudo crear el usuario" });
+  }
 });
 
 // Monta las rutas relacionadas con entregas bajo la ruta /entregas.
