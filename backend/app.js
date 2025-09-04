@@ -87,6 +87,16 @@ app.get("/db-test", async (req, res) => {
     res.status(500).json({ error: "No se pudo conectar a la base de datos" });
   }
 });
+// Ruta de prueba para verificar conexión con la base de datos
+app.get("/db-test", async (req, res) => {
+  try {
+    const [rows] = await pool.query("SELECT NOW() AS hora_actual");
+    res.json(rows);
+  } catch (err) {
+    console.error("Error en /db-test:", err);
+    res.status(500).json({ error: "No se pudo conectar a la base de datos" });
+  }
+});
 
 // ------------------------------------
 // Rutas para autenticación y sesión
