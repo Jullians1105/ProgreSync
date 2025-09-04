@@ -1,18 +1,16 @@
 // backend/services/db.js
+// Conexión a MySQL usando mysql2/promise.
+// Nota: en XAMPP tu MySQL está en el puerto 3307 (no 3306).
 
-// Importo mysql2/promise para conectarme a MySQL usando promesas.
-// Esto me va a permitir hacer consultas a la base de datos de forma asíncrona.
 import mysql from "mysql2/promise";
 
-// Aquí creo un pool de conexiones hacia la base de datos.
-// El pool me permite manejar varias conexiones de manera eficiente.
-// Uso variables de entorno (si existen) o valores por defecto para localhost.
-export const pool = mysql.createPool({
-  host: process.env.DB_HOST || "localhost", // servidor de la BD
-  user: process.env.DB_USER || "root",      // usuario
-  password: process.env.DB_PASS || "",      // contraseña
-  database: process.env.DB_NAME || "progresync", // nombre de la BD
+export const pool = await mysql.createPool({
+  host: "127.0.0.1",
+  port: 3307,            // ← importante: tu XAMPP muestra 3307
+  user: "tu_usuario_mysql",
+  password: "tu_password_mysql",
+  database: "progresync",
   waitForConnections: true,
-  connectionLimit: 10, // número máximo de conexiones
-  queueLimit: 0,
+  connectionLimit: 10,
+  queueLimit: 0
 });
