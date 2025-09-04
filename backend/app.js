@@ -1,35 +1,29 @@
 // backend/app.js
 
-// Express: librería que utilizo para crear el servidor en Node.js y definir las rutas HTTP.
+// Express: servidor HTTP y enrutamiento.
 import express from "express";
 
-// cors: me permite autorizar qué frontend puede comunicarse con mi servidor.
-// Con esto evito que navegadores bloqueen las peticiones por políticas de seguridad.
+// CORS: define qué origen (frontend) puede llamar a este backend desde el navegador.
 import cors from "cors";
 
-// express-session: lo uso para manejar sesiones en el servidor.
-// Crea una cookie en el navegador del usuario donde se guarda un identificador de sesión.
+// Sesiones: gestiona una cookie de sesión por usuario.
 import session from "express-session";
 
-// bcryptjs: sirve para comparar contraseñas ingresadas por el usuario con las que tengo guardadas como hash en la base de datos.
-// Así nunca guardo ni manejo contraseñas en texto plano.
+// Bcrypt: compara contraseñas con el hash guardado en la base de datos.
 import bcrypt from "bcryptjs";
 
-// Importo mis rutas ya implementadas para el manejo de entregas de prácticas.
+// Rutas del módulo de entregas.
 import entregasRoutes from "./routes/entregas.routes.js";
 
-// Importo la conexión a MySQL (pool de conexiones).
-// Este pool lo utilizo en las consultas a la base de datos.
+// Pool de conexiones a MySQL.
 import { pool } from "./services/db.js";
 
-// Inicializo la aplicación de Express.
+// Crear aplicación Express.
 const app = express();
 
-// Configuración de CORS.
-// Aquí debo poner la URL del FRONTEND (no la del backend), ya me equivoqué antes.
-// Ejemplos:
-// - Vite/React: "http://localhost:5173"
-// - Live Server: "http://127.0.0.1:5500"
+// CORS: pon aquí la URL de tu frontend.
+// - Si usas Vite:  http://localhost:5173
+// - Si usas Live Server: http://127.0.0.1:5500
 app.use(
   cors({
     origin: "http://localhost:5173",
@@ -37,29 +31,25 @@ app.use(
   })
 );
 
-// Permito que el servidor pueda leer cuerpos de peticiones en formato JSON.
+// Parseo de JSON en peticiones.
 app.use(express.json());
 
-// Configuración de sesiones en el servidor.
-// La sesión se guarda en memoria del servidor y se identifica con una cookie en el cliente.
-// El "secret" firma esa cookie para que no pueda ser manipulada por terceros.
-// La cookie expira en 1 hora.
+// Sesiones en el servidor.
 app.use(
   session({
     secret: "clave_de_sesion_proyecto",
     resave: false,
     saveUninitialized: false,
     cookie: {
-      httpOnly: true, // la cookie no puede ser leída por JavaScript en el navegador
+      httpOnly: true,
       maxAge: 1000 * 60 * 60, // 1 hora
-      sameSite: "lax",        // controla cómo viaja la cookie entre dominios
-      secure: false,          // en producción debería ser true con HTTPS
+      sameSite: "lax",
+      secure: false, // en producción con HTTPS debe ser true
     },
   })
 );
 
-// Pequeño middleware para exigir rol en rutas protegidas.
-// Verifica que exista sesión y que el rol del usuario esté en la lista permitida.
+// Middleware para exigir rol en rutas protegidas.
 function requireRole(...rolesPermitidos) {
   return (req, res, next) => {
     const user = req.session?.user;
@@ -71,23 +61,12 @@ function requireRole(...rolesPermitidos) {
   };
 }
 
-// Ruta raíz para comprobar rápidamente que el servidor está activo.
+// Salud del backend.
 app.get("/", (req, res) => {
   res.send("Servidor backend funcionando");
 });
 
-// Ruta de prueba para verificar conexión con la base de datos.
-// Devuelve la hora actual desde MySQL si la conexión está operativa.
-app.get("/db-test", async (req, res) => {
-  try {
-    const [rows] = await pool.query("SELECT NOW() AS hora_actual");
-    res.json(rows);
-  } catch (err) {
-    console.error("Error en /db-test:", err);
-    res.status(500).json({ error: "No se pudo conectar a la base de datos" });
-  }
-});
-// Ruta de prueba para verificar conexión con la base de datos
+// Prueba de conexión a la base de datos.
 app.get("/db-test", async (req, res) => {
   try {
     const [rows] = await pool.query("SELECT NOW() AS hora_actual");
@@ -98,11 +77,7 @@ app.get("/db-test", async (req, res) => {
   }
 });
 
-// ------------------------------------
-// Rutas para autenticación y sesión
-// ------------------------------------
-
-// POST /login: valida las credenciales de un usuario y crea una sesión si son correctas.
+// Autenticación: login.
 app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body || {};
@@ -110,18 +85,15 @@ app.post("/login", async (req, res) => {
       return res.status(400).json({ error: "Faltan credenciales" });
     }
 
-    // Consulto en la base de datos si existe el usuario con ese correo.
     const [[user]] = await pool.query(
       "SELECT id, email, password_hash, rol FROM usuarios WHERE email = ? LIMIT 1",
       [email]
     );
     if (!user) return res.status(401).json({ error: "Credenciales inválidas" });
 
-    // Comparo la contraseña que ingresó el usuario con el hash almacenado en la base de datos.
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) return res.status(401).json({ error: "Credenciales inválidas" });
 
-    // Si todo está bien, guardo los datos mínimos en la sesión.
     req.session.user = { id: user.id, email: user.email, role: user.rol };
     return res.json({ ok: true });
   } catch (err) {
@@ -130,45 +102,36 @@ app.post("/login", async (req, res) => {
   }
 });
 
-// GET /me: devuelve los datos del usuario que tiene la sesión activa.
+// Autenticación: usuario actual.
 app.get("/me", (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: "No autenticado" });
   res.json({ user: req.session.user });
 });
 
-// POST /logout: elimina la sesión y borra la cookie del navegador.
+// Autenticación: logout.
 app.post("/logout", (req, res) => {
   req.session.destroy(() => res.json({ ok: true }));
 });
 
-// ========================================
-// Creación de usuarios por parte de un admin
-// ========================================
-// POST /usuarios: crea cuentas nuevas (docente, estudiante, admin, empresa) con correo y contraseña.
-// Solo permite el acceso a usuarios con rol 'admin'.
+// Gestión de usuarios por admin.
 app.post("/usuarios", requireRole("admin"), async (req, res) => {
   try {
     const { nombre, email, password, rol } = req.body || {};
-
-    // Validaciones mínimas de entrada
     if (!email || !password || !rol) {
       return res.status(400).json({ error: "email, password y rol son obligatorios" });
     }
 
-    // Ajusta esta lista a los valores permitidos en tu ENUM de MySQL.
     const rolesValidos = ["estudiante", "docente", "admin", "empresa"];
     if (!rolesValidos.includes(rol)) {
       return res.status(400).json({ error: "rol inválido" });
     }
 
-    // Rechazar correos duplicados
     const [existe] = await pool.query(
       "SELECT id FROM usuarios WHERE email = ? LIMIT 1",
       [email]
     );
     if (existe.length) return res.status(409).json({ error: "El email ya está registrado" });
 
-    // Generar hash de la contraseña y guardar
     const hash = await bcrypt.hash(password, 12);
     await pool.query(
       "INSERT INTO usuarios (nombre, email, rol, password_hash) VALUES (?,?,?,?)",
@@ -182,11 +145,10 @@ app.post("/usuarios", requireRole("admin"), async (req, res) => {
   }
 });
 
-// Monta las rutas relacionadas con entregas bajo la ruta /entregas.
+// Rutas de entregas.
 app.use("/entregas", entregasRoutes);
 
-// Inspector de rutas: muestra todas las rutas registradas en este servidor.
-// Es útil para depuración y verificar qué endpoints están disponibles.
+// Inspector de rutas para depuración.
 app.get("/debug/routes", (req, res) => {
   const routes = [];
   const stack = app._router?.stack || [];
@@ -219,9 +181,9 @@ app.get("/debug/routes", (req, res) => {
   res.json(routes);
 });
 
-// Inicio del servidor en el puerto 8000.
-// Aquí defino en qué dirección escuchar las peticiones de los clientes.
+// Arranque del servidor.
 const PORT = 8000;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en http://localhost:${PORT}`);
 });
+
