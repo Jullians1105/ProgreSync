@@ -26,7 +26,7 @@ import { pool } from "./services/db.js";
 const app = express();
 
 // Configuración de CORS.
-// Aquí debo poner la URL del FRONTEND (no la del backend).
+// Aquí debo poner la URL del FRONTEND (no la del backend), ya me equivoqué antes.
 // Ejemplos:
 // - Vite/React: "http://localhost:5173"
 // - Live Server: "http://127.0.0.1:5500"
@@ -119,9 +119,11 @@ app.post("/logout", (req, res) => {
   req.session.destroy(() => res.json({ ok: true }));
 });
 
-// ------------------------------------
+
+
+// ========================================
 // Creación de usuarios por parte de un admin
-// ------------------------------------
+// ========================================
 // POST /usuarios: crea cuentas nuevas (docente, estudiante, admin, empresa) con correo y contraseña.
 // Solo permite el acceso a usuarios con rol 'admin'.
 app.post("/usuarios", requireRole("admin"), async (req, res) => {
