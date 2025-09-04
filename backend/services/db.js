@@ -6,7 +6,7 @@ import mysql from "mysql2/promise";
 
 export const pool = await mysql.createPool({
   host: "127.0.0.1",
-  port: 3307,            // ← importante: tu XAMPP muestra 3307
+  port: 3307, //El que me muestra XAMPP
   user: "tu_usuario_mysql",
   password: "tu_password_mysql",
   database: "progresync",
