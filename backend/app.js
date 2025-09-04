@@ -76,6 +76,18 @@ app.get("/", (req, res) => {
   res.send("Servidor backend funcionando");
 });
 
+// Ruta de prueba para verificar conexión con la base de datos.
+// Devuelve la hora actual desde MySQL si la conexión está operativa.
+app.get("/db-test", async (req, res) => {
+  try {
+    const [rows] = await pool.query("SELECT NOW() AS hora_actual");
+    res.json(rows);
+  } catch (err) {
+    console.error("Error en /db-test:", err);
+    res.status(500).json({ error: "No se pudo conectar a la base de datos" });
+  }
+});
+
 // ------------------------------------
 // Rutas para autenticación y sesión
 // ------------------------------------
@@ -118,8 +130,6 @@ app.get("/me", (req, res) => {
 app.post("/logout", (req, res) => {
   req.session.destroy(() => res.json({ ok: true }));
 });
-
-
 
 // ========================================
 // Creación de usuarios por parte de un admin
