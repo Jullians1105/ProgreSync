@@ -28,7 +28,7 @@ const app = express();
 // "credentials: true" permite que la cookie de sesión viaje en las solicitudes.
 app.use(
   cors({
-    origin: "http://localhost:5173", // aquí pondría la URL del frontend
+    origin: "http://localhost:8000", // aquí pongo la URL del frontend
     credentials: true,
   })
 );
