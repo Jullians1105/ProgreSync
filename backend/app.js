@@ -1,40 +1,37 @@
 // backend/app.js
 
-// Express: servidor HTTP y enrutamiento.
+// Express: servidor HTTP y enrutamiento
 import express from "express";
 
-// CORS: define qué origen (frontend) puede llamar a este backend desde el navegador.
+// CORS: define qué frontend puede llamar a este backend
 import cors from "cors";
 
-// Sesiones: gestiona una cookie de sesión por usuario.
+// Sesiones: crea cookies de sesión en el navegador
 import session from "express-session";
 
-// Bcrypt: compara contraseñas con el hash guardado en la base de datos.
+// Bcrypt: manejo de contraseñas con hash
 import bcrypt from "bcryptjs";
 
-// Rutas del módulo de entregas.
+// Rutas del módulo de entregas
 import entregasRoutes from "./routes/entregas.routes.js";
 
-// Pool de conexiones a MySQL.
+// Conexión a MySQL
 import { pool } from "./services/db.js";
 
-// Crear aplicación Express.
 const app = express();
 
-// CORS: pon aquí la URL de tu frontend.
-// - Si usas Vite:  http://localhost:5173
-// - Si usas Live Server: http://127.0.0.1:5500
+// Configuración de CORS (ajusta al puerto de tu frontend)
 app.use(
   cors({
     origin: "http://localhost:5173",
-    credentials: true, // permite que la cookie de sesión viaje en las solicitudes
+    credentials: true,
   })
 );
 
-// Parseo de JSON en peticiones.
+// Middleware para leer JSON en peticiones
 app.use(express.json());
 
-// Sesiones en el servidor.
+// Configuración de sesiones
 app.use(
   session({
     secret: "clave_de_sesion_proyecto",
@@ -44,12 +41,12 @@ app.use(
       httpOnly: true,
       maxAge: 1000 * 60 * 60, // 1 hora
       sameSite: "lax",
-      secure: false, // en producción con HTTPS debe ser true
+      secure: false,
     },
   })
 );
 
-// Middleware para exigir rol en rutas protegidas.
+// Middleware para proteger rutas por rol
 function requireRole(...rolesPermitidos) {
   return (req, res, next) => {
     const user = req.session?.user;
@@ -61,12 +58,16 @@ function requireRole(...rolesPermitidos) {
   };
 }
 
-// Salud del backend.
+// -------------------------------
+// Rutas principales
+// -------------------------------
+
+// Salud del backend
 app.get("/", (req, res) => {
   res.send("Servidor backend funcionando");
 });
 
-// Prueba de conexión a la base de datos.
+// Prueba de conexión a la BD
 app.get("/db-test", async (req, res) => {
   try {
     const [rows] = await pool.query("SELECT NOW() AS hora_actual");
@@ -77,7 +78,7 @@ app.get("/db-test", async (req, res) => {
   }
 });
 
-// Autenticación: login.
+// Login
 app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body || {};
@@ -102,18 +103,18 @@ app.post("/login", async (req, res) => {
   }
 });
 
-// Autenticación: usuario actual.
+// Usuario actual
 app.get("/me", (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: "No autenticado" });
   res.json({ user: req.session.user });
 });
 
-// Autenticación: logout.
+// Logout
 app.post("/logout", (req, res) => {
   req.session.destroy(() => res.json({ ok: true }));
 });
 
-// Gestión de usuarios por admin.
+// Creación de usuarios (solo admin)
 app.post("/usuarios", requireRole("admin"), async (req, res) => {
   try {
     const { nombre, email, password, rol } = req.body || {};
@@ -145,10 +146,10 @@ app.post("/usuarios", requireRole("admin"), async (req, res) => {
   }
 });
 
-// Rutas de entregas.
+// Rutas de entregas
 app.use("/entregas", entregasRoutes);
 
-// Inspector de rutas para depuración.
+// Debug de rutas registradas
 app.get("/debug/routes", (req, res) => {
   const routes = [];
   const stack = app._router?.stack || [];
@@ -181,9 +182,8 @@ app.get("/debug/routes", (req, res) => {
   res.json(routes);
 });
 
-// Arranque del servidor.
+// Servidor escuchando
 const PORT = 8000;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en http://localhost:${PORT}`);
 });
-
