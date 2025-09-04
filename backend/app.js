@@ -1,5 +1,3 @@
-// backend/app.js
-
 // Express: librería que utilizo para crear el servidor en Node.js y definir las rutas HTTP.
 import express from "express";
 
