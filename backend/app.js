@@ -21,35 +21,27 @@ import { pool } from "./services/db.js";
 const app = express();
 
 /* =========================
-   CORS (origins locales)
+   Configuración de CORS
    ========================= */
-const allowedOrigins = [
-  "http://127.0.0.1:5500", // Live Server
-  "http://localhost:5500", // Live Server (variante)
-  "http://localhost:5173", // Vite/React (si lo usas después)
+const ALLOWED_ORIGINS = [
+  "http://localhost:5500",
+  "http://127.0.0.1:5500",
+  "http://127.0.0.7:5500",  // 👈 tu Live Server actual
+  "http://localhost:5173",  // si usas Vite luego
 ];
 
 app.use(
   cors({
-    origin: allowedOrigins,
-    credentials: true,                 // necesario para cookies de sesión
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type"],  // el navegador suele enviar este header
-    optionsSuccessStatus: 204,
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true); // permite peticiones sin origin (ej: Thunder/Postman)
+      if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+      return cb(new Error("Not allowed by CORS: " + origin));
+    },
+    credentials: true,
   })
 );
-// Preflight explícito (por si algún proxy o extensión es quisquillosa)
-app.options("*", cors({
-  origin: allowedOrigins,
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type"],
-  optionsSuccessStatus: 204,
-}));
 
-/* =========================
-   Parsers
-   ========================= */
+// Middleware para leer JSON y formularios
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -65,13 +57,13 @@ app.use(
       httpOnly: true,
       maxAge: 1000 * 60 * 60, // 1 hora
       sameSite: "lax",
-      secure: false,          // en producción con HTTPS => true y app.set('trust proxy', 1)
+      secure: false,
     },
   })
 );
 
 /* =========================
-   Utilidad: middleware de rol
+   Middleware para roles
    ========================= */
 function requireRole(...rolesPermitidos) {
   return (req, res, next) => {
@@ -107,7 +99,6 @@ app.get("/db-test", async (req, res) => {
 // Login
 app.post("/login", async (req, res) => {
   try {
-    // normalizo el email a minúsculas para evitar problemas de coincidencia
     const email = String(req.body?.email || "").trim().toLowerCase();
     const password = String(req.body?.password || "");
 
@@ -125,7 +116,6 @@ app.post("/login", async (req, res) => {
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) return res.status(401).json({ error: "Credenciales inválidas" });
 
-    // guardo solo lo mínimo en sesión
     req.session.user = { id: user.id, email: user.email, role: user.rol };
     return res.json({ ok: true });
   } catch (err) {
@@ -148,7 +138,6 @@ app.post("/logout", (req, res) => {
 // Creación de usuarios (solo admin)
 app.post("/usuarios", requireRole("admin"), async (req, res) => {
   try {
-    // normalizo email
     const nombre = req.body?.nombre ?? null;
     const email = String(req.body?.email || "").trim().toLowerCase();
     const password = String(req.body?.password || "");
