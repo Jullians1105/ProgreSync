@@ -20,23 +20,42 @@ import { pool } from "./services/db.js";
 
 const app = express();
 
-// Configuración de CORS (ajusta al puerto de tu frontend)
+/* =========================
+   CORS (origins locales)
+   ========================= */
+const allowedOrigins = [
+  "http://127.0.0.1:5500", // Live Server
+  "http://localhost:5500", // Live Server (variante)
+  "http://localhost:5173", // Vite/React (si lo usas después)
+];
+
 app.use(
   cors({
-    origin: [
-      "http://127.0.0.1:5500",   // Live Server
-      "http://localhost:5500",   // Live Server (otra variante)
-      "http://localhost:5173"    // si usas Vite/React más adelante
-    ],
-    credentials: true, // importante para que viaje la cookie de sesión
+    origin: allowedOrigins,
+    credentials: true,                 // necesario para cookies de sesión
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type"],  // el navegador suele enviar este header
+    optionsSuccessStatus: 204,
   })
 );
+// Preflight explícito (por si algún proxy o extensión es quisquillosa)
+app.options("*", cors({
+  origin: allowedOrigins,
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type"],
+  optionsSuccessStatus: 204,
+}));
 
-
-// Middleware para leer JSON en peticiones
+/* =========================
+   Parsers
+   ========================= */
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Configuración de sesiones
+/* =========================
+   Sesiones
+   ========================= */
 app.use(
   session({
     secret: "clave_de_sesion_proyecto",
@@ -46,12 +65,14 @@ app.use(
       httpOnly: true,
       maxAge: 1000 * 60 * 60, // 1 hora
       sameSite: "lax",
-      secure: false,
+      secure: false,          // en producción con HTTPS => true y app.set('trust proxy', 1)
     },
   })
 );
 
-// Middleware para proteger rutas por rol
+/* =========================
+   Utilidad: middleware de rol
+   ========================= */
 function requireRole(...rolesPermitidos) {
   return (req, res, next) => {
     const user = req.session?.user;
@@ -63,9 +84,9 @@ function requireRole(...rolesPermitidos) {
   };
 }
 
-// -------------------------------
-// Rutas principales
-// -------------------------------
+/* =========================
+   Rutas principales
+   ========================= */
 
 // Salud del backend
 app.get("/", (req, res) => {
@@ -86,20 +107,25 @@ app.get("/db-test", async (req, res) => {
 // Login
 app.post("/login", async (req, res) => {
   try {
-    const { email, password } = req.body || {};
+    // normalizo el email a minúsculas para evitar problemas de coincidencia
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const password = String(req.body?.password || "");
+
     if (!email || !password) {
       return res.status(400).json({ error: "Faltan credenciales" });
     }
 
-    const [[user]] = await pool.query(
+    const [rows] = await pool.query(
       "SELECT id, email, password_hash, rol FROM usuarios WHERE email = ? LIMIT 1",
       [email]
     );
+    const user = rows[0];
     if (!user) return res.status(401).json({ error: "Credenciales inválidas" });
 
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) return res.status(401).json({ error: "Credenciales inválidas" });
 
+    // guardo solo lo mínimo en sesión
     req.session.user = { id: user.id, email: user.email, role: user.rol };
     return res.json({ ok: true });
   } catch (err) {
@@ -116,13 +142,18 @@ app.get("/me", (req, res) => {
 
 // Logout
 app.post("/logout", (req, res) => {
-  req.session.destroy(() => res.json({ ok: true }));
+  req.session.destroy(() => res.status(204).end());
 });
 
 // Creación de usuarios (solo admin)
 app.post("/usuarios", requireRole("admin"), async (req, res) => {
   try {
-    const { nombre, email, password, rol } = req.body || {};
+    // normalizo email
+    const nombre = req.body?.nombre ?? null;
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const password = String(req.body?.password || "");
+    const rol = String(req.body?.rol || "");
+
     if (!email || !password || !rol) {
       return res.status(400).json({ error: "email, password y rol son obligatorios" });
     }
@@ -141,7 +172,7 @@ app.post("/usuarios", requireRole("admin"), async (req, res) => {
     const hash = await bcrypt.hash(password, 12);
     await pool.query(
       "INSERT INTO usuarios (nombre, email, rol, password_hash) VALUES (?,?,?,?)",
-      [nombre || null, email, rol, hash]
+      [nombre, email, rol, hash]
     );
 
     return res.status(201).json({ ok: true });
