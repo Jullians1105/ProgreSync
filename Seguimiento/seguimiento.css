@@ -1,0 +1,139 @@
+/* Reset básico */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: Arial, sans-serif;
+}
+
+body {
+  background-color: #fff;
+  color: #000;
+}
+
+/* Header */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #003c71;
+  padding: 10px 30px;
+  color: white;
+  flex-wrap: wrap;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.logo .logo-icon {
+  height: 40px;
+  width: 40px;
+  margin-right: 10px;
+  border-radius: 50%;
+  object-fit: contain;
+}
+
+.logo .highlight {
+  color: orange;
+}
+
+nav ul {
+  display: flex;
+  list-style: none;
+  gap: 20px;
+}
+
+nav a {
+  text-decoration: none;
+  color: white;
+  padding-bottom: 2px;
+  transition: border-bottom 0.3s;
+}
+
+nav a.active,
+nav a:hover {
+  border-bottom: 2px solid white;
+}
+
+/* Main Section */
+main {
+  padding: 60px 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.login-section {
+  max-width: 700px;
+  text-align: center;
+}
+
+.login-section h2 {
+  font-weight: bold;
+  margin-bottom: 20px;
+}
+
+.login-section p {
+  margin-bottom: 40px;
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+/* Formulario */
+form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+form label {
+  margin-bottom: 10px;
+  font-weight: bold;
+}
+
+form input {
+  padding: 8px;
+  width: 250px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  margin-bottom: 20px;
+}
+
+form button {
+  background-color: #000;
+  color: white;
+  padding: 10px 25px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+form button:hover {
+  background-color: #222;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  nav ul {
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .login-section {
+    padding: 0 10px;
+  }
+
+  form input {
+    width: 100%;
+  }
+}
