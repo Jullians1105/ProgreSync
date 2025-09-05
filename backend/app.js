@@ -23,10 +23,15 @@ const app = express();
 // Configuración de CORS (ajusta al puerto de tu frontend)
 app.use(
   cors({
-    origin: "http://localhost:5173",
-    credentials: true,
+    origin: [
+      "http://127.0.0.1:5500",   // Live Server
+      "http://localhost:5500",   // Live Server (otra variante)
+      "http://localhost:5173"    // si usas Vite/React más adelante
+    ],
+    credentials: true, // importante para que viaje la cookie de sesión
   })
 );
+
 
 // Middleware para leer JSON en peticiones
 app.use(express.json());
