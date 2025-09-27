@@ -26,14 +26,14 @@ const app = express();
 const ALLOWED_ORIGINS = [
   "http://localhost:5500",
   "http://127.0.0.1:5500",
-  "http://127.0.0.7:5500",  // 👈 tu Live Server actual
-  "http://localhost:5173",  // si usas Vite luego
+  "http://127.0.0.7:5500", // Live Server
+  "http://localhost:5173",  // Vite
 ];
 
 app.use(
   cors({
     origin: (origin, cb) => {
-      if (!origin) return cb(null, true); // permite peticiones sin origin (ej: Thunder/Postman)
+      if (!origin) return cb(null, true); // permite Postman/Thunder
       if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
       return cb(new Error("Not allowed by CORS: " + origin));
     },
@@ -41,23 +41,25 @@ app.use(
   })
 );
 
-// Middleware para leer JSON y formularios
+// Body parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 /* =========================
    Sesiones
    ========================= */
+app.set("trust proxy", 1);
 app.use(
   session({
+    name: "sid",
     secret: "clave_de_sesion_proyecto",
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      maxAge: 1000 * 60 * 60, // 1 hora
       sameSite: "lax",
-      secure: false,
+      secure: false,            // true solo si usas HTTPS
+      maxAge: 1000 * 60 * 60,   // 1 hora
     },
   })
 );
@@ -69,7 +71,8 @@ function requireRole(...rolesPermitidos) {
   return (req, res, next) => {
     const user = req.session?.user;
     if (!user) return res.status(401).json({ error: "No autenticado" });
-    if (!rolesPermitidos.includes(user.role)) {
+    const rol = user.rol || user.role; // tolerante
+    if (!rolesPermitidos.includes(rol)) {
       return res.status(403).json({ error: "Sin permisos" });
     }
     next();
@@ -77,16 +80,17 @@ function requireRole(...rolesPermitidos) {
 }
 
 /* =========================
-   Rutas principales
+   Rutas de salud y prueba
    ========================= */
-
-// Salud del backend
-app.get("/", (req, res) => {
+app.get("/", (_req, res) => {
   res.send("Servidor backend funcionando");
 });
 
-// Prueba de conexión a la BD
-app.get("/db-test", async (req, res) => {
+app.get("/health", (_req, res) => {
+  res.json({ ok: true });
+});
+
+app.get("/db-test", async (_req, res) => {
   try {
     const [rows] = await pool.query("SELECT NOW() AS hora_actual");
     res.json(rows);
@@ -95,6 +99,10 @@ app.get("/db-test", async (req, res) => {
     res.status(500).json({ error: "No se pudo conectar a la base de datos" });
   }
 });
+
+/* =========================
+   Autenticación
+   ========================= */
 
 // Login
 app.post("/login", async (req, res) => {
@@ -107,7 +115,7 @@ app.post("/login", async (req, res) => {
     }
 
     const [rows] = await pool.query(
-      "SELECT id, email, password_hash, rol FROM usuarios WHERE email = ? LIMIT 1",
+      "SELECT id, nombre, email, password_hash, rol FROM usuarios WHERE email = ? LIMIT 1",
       [email]
     );
     const user = rows[0];
@@ -116,8 +124,16 @@ app.post("/login", async (req, res) => {
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) return res.status(401).json({ error: "Credenciales inválidas" });
 
-    req.session.user = { id: user.id, email: user.email, role: user.rol };
-    return res.json({ ok: true });
+    // Guarda ambas claves para compatibilidad (rol y role)
+    req.session.user = {
+      id: user.id,
+      nombre: user.nombre,
+      email: user.email,
+      rol: user.rol,
+      role: user.rol,
+    };
+
+    return res.json({ ok: true, user: req.session.user });
   } catch (err) {
     console.error("Error en login:", err);
     return res.status(500).json({ error: "Error en el inicio de sesión" });
@@ -132,10 +148,17 @@ app.get("/me", (req, res) => {
 
 // Logout
 app.post("/logout", (req, res) => {
-  req.session.destroy(() => res.status(204).end());
+  req.session.destroy(() => {
+    res.clearCookie("sid");
+    res.status(204).end();
+  });
 });
 
-// Creación de usuarios (solo admin)
+/* =========================
+   Gestión de usuarios
+   ========================= */
+
+// Crear usuario (solo admin)
 app.post("/usuarios", requireRole("admin"), async (req, res) => {
   try {
     const nombre = req.body?.nombre ?? null;
@@ -152,10 +175,7 @@ app.post("/usuarios", requireRole("admin"), async (req, res) => {
       return res.status(400).json({ error: "rol inválido" });
     }
 
-    const [existe] = await pool.query(
-      "SELECT id FROM usuarios WHERE email = ? LIMIT 1",
-      [email]
-    );
+    const [existe] = await pool.query("SELECT id FROM usuarios WHERE email = ? LIMIT 1", [email]);
     if (existe.length) return res.status(409).json({ error: "El email ya está registrado" });
 
     const hash = await bcrypt.hash(password, 12);
@@ -171,11 +191,28 @@ app.post("/usuarios", requireRole("admin"), async (req, res) => {
   }
 });
 
-// Rutas de entregas
+// Listar usuarios (solo admin)
+app.get("/usuarios", requireRole("admin"), async (_req, res) => {
+  try {
+    const [rows] = await pool.query(
+      "SELECT id, nombre, email, rol, created_at FROM usuarios ORDER BY id"
+    );
+    return res.json({ ok: true, usuarios: rows });
+  } catch (err) {
+    console.error("Error listando usuarios:", err);
+    return res.status(500).json({ error: "No se pudo obtener la lista de usuarios" });
+  }
+});
+
+/* =========================
+   Rutas de entregas
+   ========================= */
 app.use("/entregas", entregasRoutes);
 
-// Debug de rutas registradas
-app.get("/debug/routes", (req, res) => {
+/* =========================
+   Debug de rutas registradas
+   ========================= */
+app.get("/debug/routes", (_req, res) => {
   const routes = [];
   const stack = app._router?.stack || [];
   for (const layer of stack) {
@@ -207,8 +244,11 @@ app.get("/debug/routes", (req, res) => {
   res.json(routes);
 });
 
-// Servidor escuchando
+/* =========================
+   Servidor
+   ========================= */
 const PORT = 8000;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en http://localhost:${PORT}`);
 });
+
