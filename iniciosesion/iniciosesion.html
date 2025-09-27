@@ -1,57 +1,28 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Inicio de sesión</title>
-  <link rel="icon" href="../Imagenes/Logo_ProgeSync.png" type="image/png"/>
-  <link rel="stylesheet" href="iniciosesion.css">
+  <meta charset="utf-8" />
+  <title>ProgeSync | Iniciar sesión</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 </head>
 <body>
-  <header class="barra-superior fade-in">
-    <div class="Logo_ProgeSync fade-in">
-      <img src="../Imagenes/Logo_ProgeSync.png" alt="Logo ProgeSync">
-    </div>
-    <h1 class="titulo fade-in" onclick="location.href='../index.html'">
-      <span class="proge">Proge</span><span class="sync">Sync</span>
-    </h1>
-  </header>
+  <main>
+    <h1>Iniciar sesión</h1>
+    <form id="loginForm">
+      <label for="email">E-mail</label>
+      <input type="email" id="email" name="email" required value="admin@correo.com" />
 
-  <div class="contenido fade-in">
-    <section class="parte_login fade-in">
-      <h1 class="titulo_login">Iniciar sesión</h1>
+      <label for="password">Contraseña</label>
+      <input type="password" id="password" name="password" required />
 
-      <!-- Formulario con IDs para enganchar el JS -->
-      <form id="loginForm">
-        <div class="form-group fade-in">
-          <label for="email">E-mail</label>
-          <input type="email" id="email" name="email" class="form-content" required>
-        </div>
+      <!-- ¡Importante!: submit -->
+      <button id="loginBtn" type="submit">Iniciar sesión</button>
+    </form>
 
-        <div class="form-group fade-in">
-          <label for="password">Contraseña</label>
-          <input type="password" id="password" name="password" class="form-content" required>
-        </div>
+    <pre id="out" style="background:#111;color:#0f0;padding:12px;border-radius:8px;"></pre>
+  </main>
 
-        <div class="form-actions fade-in">
-          <p class="link-recuperar fade-in">
-            ¿Olvidaste tu contraseña?
-            <a href="recuperarcontraseña.html">Recuperar contraseña</a>
-          </p>
-
-          <button type="submit" class="submit animar-glow">Iniciar sesión</button>
-
-          <p id="msg" aria-live="polite"></p> <!-- aquí van mensajes dinámicos -->
-
-          <div class="form-links fade-in">
-            <p>¿No tienes una cuenta? Habla con tu tutor para que te cree una cuenta</p>
-          </div>
-        </div>
-      </form>
-    </section>
-  </div>
-
-  <!-- Script que maneja el login -->
-  <script src="iniciosesion.js"></script>
+  <!-- Carga el script al final del body -->
+  <script type="module" src="./login.js"></script>
 </body>
 </html>
