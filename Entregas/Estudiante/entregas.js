@@ -1,53 +1,72 @@
-// Yo apunto a mi API local
-const API = "http://localhost:8000/api/entregas";
-const ID_ESTUDIANTE = window.SESION.id; // viene del guard.js
+// Entregas/Estudiante/entregas.js
+import { API_BASE } from "/guard.js";
 
-// Función para escapar texto y evitar XSS
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+// Espera a que el guard valide y devuelva el usuario
+const SESSION = await window.SESSION_PROMISE;
+if (!SESSION) throw new Error("Sesión inválida o sin permisos");
 
-// Yo cargo mis entregas
+const API = `${API_BASE}/entregas`;     // backend montó app.use("/entregas", …)
+const ID_ESTUDIANTE = SESSION.id;       // id del estudiante desde la sesión
+
+// Escapar texto
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"
+}[c]));
+
+// Cargar mis entregas
 async function cargarMisEntregas() {
   const tbody = document.getElementById("tbody-entregas");
   tbody.innerHTML = "<tr><td colspan='5'>Cargando...</td></tr>";
   try {
-    const res = await fetch(`${API}/mis/${ID_ESTUDIANTE}`);
+    const res = await fetch(`${API}/mis/${ID_ESTUDIANTE}`, {
+      credentials: "include",               // 👈 envía cookie de sesión
+    });
+    if (!res.ok) throw new Error("Error al listar");
     const data = await res.json();
-    if (!Array.isArray(data) || !data.length) {
+
+    if (!Array.isArray(data) || data.length === 0) {
       tbody.innerHTML = "<tr><td colspan='5'>Sin entregas aún</td></tr>";
       return;
     }
-    tbody.innerHTML = data.map(e=>`
+    tbody.innerHTML = data.map(e => `
       <tr>
         <td>${esc(e.titulo)}</td>
         <td>${esc(e.descripcion)}</td>
-        <td><a href="${esc(e.archivo)}" target="_blank">Ver</a></td>
+        <td><a href="${esc(e.archivo)}" target="_blank" rel="noopener">Ver</a></td>
         <td><span class="badge badge-${esc(e.estado)}">${esc(e.estado)}</span></td>
-        <td>${new Date(e.fecha).toLocaleString()}</td>
+        <td>${e.fecha ? new Date(e.fecha).toLocaleString() : ""}</td>
       </tr>
     `).join("");
-  } catch(err) {
+  } catch (err) {
+    console.error(err);
     tbody.innerHTML = "<tr><td colspan='5' class='text-danger'>Error al cargar</td></tr>";
   }
 }
 
-// Yo escucho el submit del form
-document.getElementById("form-entrega").addEventListener("submit", async e=>{
+// Envío del formulario
+document.getElementById("form-entrega").addEventListener("submit", async (e) => {
   e.preventDefault();
+  const msg = document.getElementById("msg");
+  msg.textContent = "Enviando...";
+
   const fd = new FormData(e.target);
   fd.append("id_estudiante", ID_ESTUDIANTE);
 
-  const msg = document.getElementById("msg");
-  msg.textContent = "Enviando...";
   try {
-    const res = await fetch(API, { method:"POST", body:fd });
+    const res = await fetch(API, {
+      method: "POST",
+      body: fd,
+      credentials: "include",              // 👈 imprescindible para sesión
+    });
     if (!res.ok) throw new Error("Error al enviar");
     msg.textContent = "¡Enviado!";
     e.target.reset();
     cargarMisEntregas();
-  } catch(err) {
+  } catch (err) {
+    console.error(err);
     msg.textContent = "Error";
   }
 });
 
+// Inicial
 cargarMisEntregas();
-
