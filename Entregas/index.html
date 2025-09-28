@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Entregas</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Arial;margin:24px}
+  </style>
+</head>
+<body>
+  <p>Redirigiendo a tu sección de Entregas…</p>
+  <script>
+    // API del backend
+    const API_BASE = "http://localhost:8000";
+
+    (async () => {
+      try {
+        const r = await fetch(`${API_BASE}/me`, { credentials: "include" });
+        if (!r.ok) {
+          // sin sesión → login
+          location.href = "/iniciosesion/iniciosesion.html";
+          return;
+        }
+        const me = await r.json();
+        const rol = (me && me.user && (me.user.rol || me.user.role)) || null;
+
+        if (rol === "docente" || rol === "admin") {
+          // docente/admin → vista de docente
+          location.href = "Docente/docente.html";
+        } else if (rol === "estudiante") {
+          // estudiante → vista de estudiante
+          location.href = "Estudiante/entregas.html";
+        } else {
+          location.href = "/index.html";
+        }
+      } catch (e) {
+        console.error(e);
+        location.href = "/index.html";
+      }
+    })();
+  </script>
+</body>
+</html>
