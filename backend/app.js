@@ -18,6 +18,13 @@ import entregasRoutes from "./routes/entregas.routes.js";
 // Conexión a MySQL
 import { pool } from "./services/db.js";
 
+// Static uploads (para servir archivos subidos)
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 
 /* =========================
@@ -27,7 +34,7 @@ const ALLOWED_ORIGINS = [
   "http://localhost:5500",
   "http://127.0.0.1:5500",
   "http://127.0.0.7:5500", // Live Server
-  "http://localhost:5173",  // Vite
+  "http://localhost:5173", // Vite
 ];
 
 app.use(
@@ -58,8 +65,8 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: false,            // true solo si usas HTTPS
-      maxAge: 1000 * 60 * 60,   // 1 hora
+      secure: false, // true solo si usas HTTPS
+      maxAge: 1000 * 60 * 60, // 1 hora
     },
   })
 );
@@ -143,10 +150,9 @@ app.post("/login", async (req, res) => {
 // Usuario actual
 app.get("/me", (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: "No autenticado" });
-  const u = req.session.user;              // { id, email, role: 'docente' | 'estudiante' | ... }
-  return res.json({ user: { ...u, rol: u.role } });  // exponemos ambas llaves: role y rol
+  const u = req.session.user; // { id, email, role: 'docente' | 'estudiante' | ... }
+  return res.json({ user: { ...u, rol: u.role } }); // exponemos ambas llaves: role y rol
 });
-
 
 // Logout
 app.post("/logout", (req, res) => {
@@ -207,9 +213,15 @@ app.get("/usuarios", requireRole("admin"), async (_req, res) => {
 });
 
 /* =========================
+   Archivos subidos estáticos
+   ========================= */
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+/* =========================
    Rutas de entregas
    ========================= */
-app.use("/entregas", entregasRoutes);
+// Montamos en /api/entregas para que el front use `${API_BASE}/api/entregas`
+app.use("/api/entregas", entregasRoutes);
 
 /* =========================
    Debug de rutas registradas
@@ -251,6 +263,5 @@ app.get("/debug/routes", (_req, res) => {
    ========================= */
 const PORT = 8000;
 app.listen(PORT, () => {
-  console.log(`Servidor escuchando en http://localhost:${PORT}`);
+  console.log(`Servidor escuchando en http://${"localhost"}:${PORT}`);
 });
-
