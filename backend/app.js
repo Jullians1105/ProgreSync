@@ -143,8 +143,10 @@ app.post("/login", async (req, res) => {
 // Usuario actual
 app.get("/me", (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: "No autenticado" });
-  res.json({ user: req.session.user });
+  const u = req.session.user;              // { id, email, role: 'docente' | 'estudiante' | ... }
+  return res.json({ user: { ...u, rol: u.role } });  // exponemos ambas llaves: role y rol
 });
+
 
 // Logout
 app.post("/logout", (req, res) => {
