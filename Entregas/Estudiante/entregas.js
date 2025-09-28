@@ -2,16 +2,18 @@
 import { API_BASE } from "/guard.js";
 
 // Espera a que el guard valide y devuelva el usuario
-const SESSION = await window.SESSION_PROMISE;
+const SESSION = await window.SESION_PROMISE;
 if (!SESSION) throw new Error("Sesión inválida o sin permisos");
 
-const API = `${API_BASE}/entregas`;     // backend montó app.use("/entregas", …)
-const ID_ESTUDIANTE = SESSION.id;       // id del estudiante desde la sesión
+// Alineamos con el backend montado en /api/entregas
+const API = `${API_BASE}/api/entregas`;
+const ID_ESTUDIANTE = SESSION.id;
 
 // Escapar texto
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({
-  "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"
-}[c]));
+const esc = (s) =>
+  String(s ?? "").replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+  );
 
 // Cargar mis entregas
 async function cargarMisEntregas() {
@@ -19,7 +21,7 @@ async function cargarMisEntregas() {
   tbody.innerHTML = "<tr><td colspan='5'>Cargando...</td></tr>";
   try {
     const res = await fetch(`${API}/mis/${ID_ESTUDIANTE}`, {
-      credentials: "include",               // 👈 envía cookie de sesión
+      credentials: "include",
     });
     if (!res.ok) throw new Error("Error al listar");
     const data = await res.json();
@@ -28,18 +30,22 @@ async function cargarMisEntregas() {
       tbody.innerHTML = "<tr><td colspan='5'>Sin entregas aún</td></tr>";
       return;
     }
-    tbody.innerHTML = data.map(e => `
+    tbody.innerHTML = data
+      .map(
+        (e) => `
       <tr>
         <td>${esc(e.titulo)}</td>
         <td>${esc(e.descripcion)}</td>
         <td><a href="${esc(e.archivo)}" target="_blank" rel="noopener">Ver</a></td>
         <td><span class="badge badge-${esc(e.estado)}">${esc(e.estado)}</span></td>
         <td>${e.fecha ? new Date(e.fecha).toLocaleString() : ""}</td>
-      </tr>
-    `).join("");
+      </tr>`
+      )
+      .join("");
   } catch (err) {
     console.error(err);
-    tbody.innerHTML = "<tr><td colspan='5' class='text-danger'>Error al cargar</td></tr>";
+    tbody.innerHTML =
+      "<tr><td colspan='5' class='text-danger'>Error al cargar</td></tr>";
   }
 }
 
@@ -56,7 +62,7 @@ document.getElementById("form-entrega").addEventListener("submit", async (e) => 
     const res = await fetch(API, {
       method: "POST",
       body: fd,
-      credentials: "include",              // 👈 imprescindible para sesión
+      credentials: "include",
     });
     if (!res.ok) throw new Error("Error al enviar");
     msg.textContent = "¡Enviado!";
@@ -70,3 +76,4 @@ document.getElementById("form-entrega").addEventListener("submit", async (e) => 
 
 // Inicial
 cargarMisEntregas();
+
