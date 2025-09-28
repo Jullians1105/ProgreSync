@@ -1,45 +1,87 @@
-const API = "http://localhost:8000/api/entregas";
-const ID_DOCENTE = window.SESION.id;
+import { API_BASE } from "/guard.js";
 
-const esc = (s) => String(s ?? "");
+const SESSION = await window.SESION_PROMISE; // { id, email, role, rol }
+const API = `${API_BASE}/entregas`;
 
-async function cargarPendientes(){
-  const grid = document.getElementById("grid");
-  grid.innerHTML = "<p>Cargando...</p>";
+const grid = document.getElementById("grid");
+const msg  = document.getElementById("msg");
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+
+// Cargar pendientes
+async function cargarPendientes() {
+  msg.textContent = "Cargando…";
+  grid.innerHTML = "";
   try {
-    const res = await fetch(`${API}/pendientes`);
-    const data = await res.json();
-    if (!Array.isArray(data) || !data.length){
-      grid.innerHTML = "<p>No hay entregas pendientes</p>";
+    const r = await fetch(`${API}/pendientes`, { credentials: "include" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const data = await r.json();
+
+    if (!data.length) {
+      grid.innerHTML = `<div class="col-12"><div class="alert alert-info">No hay entregas en revisión.</div></div>`;
+      msg.textContent = "";
       return;
     }
-    grid.innerHTML = data.map(e=>`
-      <div class="col-md-4">
-        <div class="card text-dark mb-3">
-          <div class="card-body">
-            <h5>${esc(e.titulo)}</h5>
-            <p>${esc(e.descripcion)}</p>
-            <p><a href="${esc(e.archivo)}" target="_blank">Ver archivo</a></p>
-            <button class="btn btn-success btn-sm" onclick="resolver(${e.id},'aprobado')">Aprobar</button>
-            <button class="btn btn-danger btn-sm" onclick="resolver(${e.id},'rechazado')">Rechazar</button>
+
+    grid.innerHTML = data.map(e => `
+      <div class="col-12 col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm">
+          <div class="card-body d-flex flex-column">
+            <h5 class="card-title mb-1">${esc(e.titulo)}</h5>
+            <p class="text-muted mb-2">${esc(e.estudiante)} · ${esc(e.estudiante_email)}</p>
+            <p class="card-text small flex-grow-1">${esc(e.descripcion)}</p>
+            <a class="mb-2" href="${esc(e.archivo)}" target="_blank" rel="noopener">Ver archivo</a>
+
+            <div class="input-group mb-2">
+              <select class="form-select estado">
+                <option value="aprobado">Aprobar</option>
+                <option value="rechazado">Rechazar</option>
+              </select>
+            </div>
+            <textarea class="form-control comentario mb-2" placeholder="Comentario (opcional)"></textarea>
+            <button class="btn btn-success w-100 btn-guardar" data-id="${e.id}">Guardar revisión</button>
           </div>
         </div>
       </div>
     `).join("");
-  } catch(err){
-    grid.innerHTML = "<p class='text-danger'>Error cargando</p>";
+
+    msg.textContent = "";
+  } catch (err) {
+    console.error(err);
+    msg.textContent = "Error cargando pendientes";
   }
 }
 
-async function resolver(id,estado){
-  const comentario = prompt(`Comentario (${estado}):`) || "";
-  await fetch(`${API}/${id}/revision`,{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({id_docente:ID_DOCENTE,nuevo_estado:estado,comentario})
-  });
-  cargarPendientes();
-}
+// Guardar revisión (recuerda credentials)
+grid.addEventListener("click", async (ev) => {
+  const btn = ev.target.closest(".btn-guardar");
+  if (!btn) return;
+  const card = btn.closest(".card");
+  const id = btn.dataset.id;
+  const estado = card.querySelector(".estado").value;
+  const comentario = card.querySelector(".comentario").value.trim();
 
-document.getElementById("btn-cargar").addEventListener("click",cargarPendientes);
+  btn.disabled = true;
+  btn.textContent = "Guardando…";
+
+  try {
+    const r = await fetch(`${API}/${id}/estado`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ estado, comentario }),
+    });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    btn.textContent = "Guardado ✅";
+    setTimeout(cargarPendientes, 400);
+  } catch (err) {
+    console.error(err);
+    btn.textContent = "Error";
+  } finally {
+    setTimeout(() => { btn.disabled = false; btn.textContent = "Guardar revisión"; }, 1200);
+  }
+});
+
+document.getElementById("btn-cargar")?.addEventListener("click", cargarPendientes);
+cargarPendientes();
 
