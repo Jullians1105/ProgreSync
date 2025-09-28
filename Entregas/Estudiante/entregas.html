@@ -8,10 +8,20 @@
   <link rel="stylesheet" href="./entregas.css" />
 </head>
 <body class="bg-light text-dark">
+  <!-- Navbar -->
   <nav class="navbar navbar-light bg-white shadow-sm px-3 border-bottom">
     <div class="d-flex align-items-center">
-      <img src="../../Imagenes/Logo_ProgeSync.png" alt="Logo ProgeSync" style="height:40px;width:auto;margin-right:10px;" />
-      <span style="font-size:1.5rem;font-weight:bold;"><span style="color:black;">Proge</span><span style="color:orange;">Sync</span></span>
+      <!-- LOGO + Marca: todo el bloque es clickeable y lleva al inicio -->
+      <a href="/index.html" class="d-flex align-items-center text-decoration-none">
+        <img
+          src="../../Imagenes/Logo_ProgeSync.png"
+          alt="Logo ProgeSync"
+          style="height:40px; width:auto; margin-right:10px;"
+        />
+        <span style="font-size:1.5rem; font-weight:bold;">
+          <span style="color:black;">Proge</span><span style="color:orange;">Sync</span>
+        </span>
+      </a>
     </div>
   </nav>
 
@@ -29,7 +39,11 @@
     <table class="table table-striped">
       <thead class="table-dark">
         <tr>
-          <th>Título</th><th>Descripción</th><th>Archivo</th><th>Estado</th><th>Fecha</th>
+          <th>Título</th>
+          <th>Descripción</th>
+          <th>Archivo</th>
+          <th>Estado</th>
+          <th>Fecha</th>
         </tr>
       </thead>
       <tbody id="tbody-entregas"></tbody>
@@ -39,10 +53,11 @@
   <!-- Guard de rol: valida sesión ANTES de la lógica de la vista -->
   <script type="module">
     import { requireRole } from "/guard.js";
-    window.SESSION_PROMISE = requireRole(["estudiante"]); // devuelve Promise<user>
+    // guard.js expone window.SESION_PROMISE
+    window.SESION_PROMISE = requireRole(["estudiante"]);
   </script>
 
-  <!-- Lógica de esta vista (como módulo para usar await) -->
+  <!-- Lógica de esta vista (como módulo para poder usar imports/await) -->
   <script type="module" src="./entregas.js"></script>
 </body>
 </html>
