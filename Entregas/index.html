@@ -4,7 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Entregas</title>
-  <style>body{font-family:system-ui,Segoe UI,Arial;margin:24px}</style>
+  <style>
+    body {
+      font-family: system-ui, Segoe UI, Arial;
+      margin: 24px;
+    }
+  </style>
 </head>
 <body>
   <p>Redirigiendo a tu sección de Entregas…</p>
@@ -22,18 +27,25 @@
         const me = await r.json();
         const rol = me?.user?.rol || me?.user?.role;
 
-        if (rol === "docente" || rol === "admin") {
-          location.href = "Docente/docente.html";
-        } else if (rol === "estudiante") {
-          location.href = "Estudiante/entregas.html";
-        } else {
-          location.href = "/index.html";
+        switch (rol) {
+          case "estudiante":
+            location.href = "Estudiante/entregas.html";
+            break;
+          case "docente":
+            location.href = "Docente/docente.html";
+            break;
+          case "admin":
+            location.href = "/index.html"; // 👈 ahora admin va al inicio
+            break;
+          default:
+            location.href = "/index.html"; // fallback
         }
       } catch (e) {
-        console.error(e);
+        console.error("Error en redirección de entregas:", e);
         location.href = "/index.html";
       }
     })();
   </script>
 </body>
 </html>
+
