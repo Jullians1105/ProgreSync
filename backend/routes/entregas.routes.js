@@ -1,35 +1,114 @@
 // backend/routes/entregas.routes.js
 import { Router } from "express";
+import multer from "multer";
+import path from "path";
+import { pool } from "../services/db.js";
+
 const router = Router();
 
 // Log para confirmar que este archivo sí se llegó a cargar
 console.log("✅ entregas.routes.js cargado");
 
-// Ruta de diagnóstico para verificar montaje del router
-router.get("/__ping", (req, res) => {
-  res.json({ ok: true, from: "entregas.routes.js" });
+/* ────────────────────── Multer: almacenamiento ────────────────────── */
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, "uploads"), // carpeta relativa a backend/app.js
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname); // .pdf/.doc/.docx
+    const base = path
+      .basename(file.originalname, ext)
+      .toLowerCase()
+      .replace(/[^a-z0-9-_]+/gi, "-")
+      .slice(0, 50);
+    const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, `${base}-${unique}${ext}`);
+  },
 });
 
-// Ruta MOCK para el Docente: pendientes
-router.get("/pendientes", (req, res) => {
-  res.json([
-    {
-      id: 1,
-      titulo: "Informe Final",
-      descripcion: "Entrega pendiente de revisión",
-      archivo: "#",
-      estado: "en_revision",
-      fecha: new Date().toISOString(),
-    },
-    {
-      id: 2,
-      titulo: "Reporte Semanal",
-      descripcion: "Documento con actividades de la semana",
-      archivo: "#",
-      estado: "en_revision",
-      fecha: new Date().toISOString(),
-    },
-  ]);
+const upload = multer({
+  storage,
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
 });
+
+/* ────────────────────── Diagnóstico ────────────────────── */
+router.get("/__ping", (_req, res) => res.json({ ok: true, from: "entregas.routes.js" }));
+
+/* ────────────────────── Crear entrega (con archivo) ──────────────────────
+   POST /api/entregas
+   FormData:
+   - titulo (string)       (required)
+   - descripcion (string)  (optional)
+   - id_estudiante (int)   (required)
+   - archivo (file)        (required)
+*/
+router.post("/", upload.single("archivo"), async (req, res) => {
+  try {
+    const { titulo, descripcion, id_estudiante } = req.body;
+    if (!titulo || !id_estudiante || !req.file) {
+      return res.status(400).json({ error: "Faltan campos o archivo" });
+    }
+
+    const archivoUrl = `/uploads/${req.file.filename}`;
+    const estado = "en_revision";
+
+    await pool.query(
+      `INSERT INTO entregas (id_estudiante, titulo, descripcion, archivo, estado, fecha)
+       VALUES (?,?,?,?,?, NOW())`,
+      [id_estudiante, titulo, descripcion ?? null, archivoUrl, estado]
+    );
+
+    return res.status(201).json({ ok: true, archivo: archivoUrl });
+  } catch (err) {
+    console.error("Error POST /api/entregas:", err);
+    return res.status(500).json({ error: "No se pudo registrar la entrega" });
+  }
+});
+
+/* ────────────────────── Listar mis entregas ──────────────────────
+   GET /api/entregas/mis/:id_estudiante
+*/
+router.get("/mis/:id_estudiante", async (req, res) => {
+  try {
+    const { id_estudiante } = req.params;
+    const [rows] = await pool.query(
+      `SELECT id, titulo, descripcion, archivo, estado, fecha
+       FROM entregas
+       WHERE id_estudiante = ?
+       ORDER BY fecha DESC`,
+      [id_estudiante]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Error GET /api/entregas/mis:", err);
+    res.status(500).json({ error: "No se pudieron obtener las entregas" });
+  }
+});
+
+/* ────────────────────── Pendientes para docente ──────────────────────
+   GET /api/entregas/pendientes
+*/
+router.get("/pendientes", async (_req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT e.id, e.titulo, e.descripcion, e.archivo, e.estado, e.fecha,
+              u.nombre AS estudiante, u.email AS estudiante_email
+       FROM entregas e
+       JOIN usuarios u ON u.id = e.id_estudiante
+       WHERE e.estado = 'en_revision'
+       ORDER BY e.fecha DESC`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Error GET /api/entregas/pendientes:", err);
+    res.status(500).json({ error: "No se pudieron obtener las pendientes" });
+  }
+});
+
+/* ────────────────────── (Opcional) Cambiar estado ──────────────────────
+   PATCH /api/entregas/:id/estado  { estado, comentario? }
+   (Deja preparado para futura vista docente)
+*/
+// import { requireRole } from somewhere if quieres protegerla
+// router.patch("/:id/estado", requireRole("docente", "admin"), async (req, res) => { ... });
 
 export default router;
+
