@@ -51,10 +51,11 @@
   </main>
 
   <!-- Guard de rol: SOLO docentes pueden entrar a esta vista -->
-  <script type="module">
-    import { requireRole } from "../guard.js";
-    window.SESION = requireRole(["docente"]); // guarda sesión en window.SESION
-  </script>
+  <!-- Guard de rol: SOLO docentes/admin pueden entrar a esta vista -->
+<script type="module">
+  import { requireRole } from "/guard.js";
+  window.SESION_PROMISE = requireRole(["docente", "admin"]); // guarda sesión en window.SESION_PROMISE
+</script>
 
   <!-- Lógica específica del panel del docente -->
   <script>
