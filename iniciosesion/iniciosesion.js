@@ -1,54 +1,77 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Inicio de sesión</title>
-  <link rel="icon" href="../Imagenes/Logo_ProgeSync.png" type="image/png" />
-  <link rel="stylesheet" href="iniciosesion.css" />
-  <!-- Cargamos el JS con defer para que el DOM ya exista -->
-  <script src="iniciosesion.js" defer></script>
-</head>
-<body>
-  <header class="barra-superior fade-in">
-    <div class="Logo_ProgeSync fade-in">
-      <img src="../Imagenes/Logo_ProgeSync.png" alt="Logo ProgeSync" />
-    </div>
-    <h1 class="titulo fade-in" onclick="location.href='../index.html'">
-      <span class="proge">Proge</span><span class="sync">Sync</span>
-    </h1>
-  </header>
+// iniciosesion/iniciosesion.js
 
-  <div class="contenido fade-in">
-    <section class="parte_login fade-in">
-      <h1 class="titulo_login">Iniciar sesión</h1>
+// Usamos el mismo host del frontend para que la cookie de sesión viaje
+const API_BASE = `http://${location.hostname}:8000`;
 
-      <form id="loginForm" autocomplete="on">
-        <div class="form-group fade-in">
-          <label for="email">E-mail</label>
-          <input type="email" id="email" name="email" class="form-content" required />
-        </div>
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("loginForm");
+  const emailInput = document.getElementById("email");
+  const passInput = document.getElementById("password");
+  const msg = document.getElementById("loginMsg");
 
-        <div class="form-group fade-in">
-          <label for="password">Contraseña</label>
-          <input type="password" id="password" name="password" class="form-content" required />
-        </div>
+  // helper de mensajes
+  const show = (text, type = "info") => {
+    msg.textContent = text;
+    msg.style.color =
+      type === "error" ? "#b00020" : type === "ok" ? "#0a7c2f" : "#444";
+  };
 
-        <div class="form-actions fade-in">
-          <p class="link-recuperar fade-in">
-            ¿Olvidaste tu contraseña?
-            <a href="recuperarcontraseña.html">Recuperar contraseña</a>
-          </p>
+  // Por si llegaron query params, los rellenamos (no es obligatorio)
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.get("email")) emailInput.value = q.get("email");
+    if (q.get("password")) passInput.value = q.get("password");
+  } catch {}
 
-          <button type="submit" class="submit animar-glow">Iniciar sesión</button>
-          <p id="loginMsg" aria-live="polite" style="margin-top:8px"></p>
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault(); // ¡IMPORTANTE!
 
-          <div class="form-links fade-in">
-            <p>¿No tienes una cuenta? Habla con tu tutor para que te cree una cuenta</p>
-          </div>
-        </div>
-      </form>
-    </section>
-  </div>
-</body>
-</html>
+    const email = String(emailInput.value || "").trim().toLowerCase();
+    const password = String(passInput.value || "");
+
+    if (!email || !password) {
+      show("Debo ingresar el e-mail y la contraseña.", "error");
+      return;
+    }
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.style.opacity = "0.7";
+    show("Verificando credenciales…");
+
+    try {
+      const res = await fetch(`${API_BASE}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include", // 👈 para que la cookie de sesión viaje
+        body: JSON.stringify({ email, password }),
+      });
+
+      let data = null;
+      try { data = await res.json(); } catch {}
+
+      if (!res.ok) {
+        show(data?.error || "Credenciales inválidas o error en el servidor.", "error");
+        return;
+      }
+
+      // Opcional: consultamos /me para conocer el rol si quieres redirigir distinto
+      const meRes = await fetch(`${API_BASE}/me`, { credentials: "include" });
+      let me = null;
+      try { me = await meRes.json(); } catch {}
+
+      const role = me?.user?.rol || me?.user?.role || null;
+      show("Inicio de sesión correcto. Redirigiendo…", "ok");
+
+      // Redirige a la portada (o a Entregas puente si prefieres)
+      // window.location.href = "../Entregas/index.html"; // si quieres ir directo a entregas
+      window.location.href = "../index.html";
+    } catch (err) {
+      console.error(err);
+      show("Error de red. Verifica que el backend esté en ejecución.", "error");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.style.opacity = "1";
+    }
+  });
+});
