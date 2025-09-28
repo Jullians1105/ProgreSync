@@ -5,7 +5,7 @@ import { API_BASE } from "/guard.js";
 const SESSION = await window.SESION_PROMISE;
 if (!SESSION) throw new Error("Sesión inválida o sin permisos");
 
-// Alineamos con el backend montado en /api/entregas
+// Alineado con backend en /api/entregas
 const API = `${API_BASE}/api/entregas`;
 const ID_ESTUDIANTE = SESSION.id;
 
@@ -23,7 +23,7 @@ async function cargarMisEntregas() {
     const res = await fetch(`${API}/mis/${ID_ESTUDIANTE}`, {
       credentials: "include",
     });
-    if (!res.ok) throw new Error("Error al listar");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
     if (!Array.isArray(data) || data.length === 0) {
@@ -55,7 +55,7 @@ document.getElementById("form-entrega").addEventListener("submit", async (e) => 
   const msg = document.getElementById("msg");
   msg.textContent = "Enviando...";
 
-  const fd = new FormData(e.target);
+  const fd = new FormData(e.target);       // ahora incluye titulo, descripcion y archivo (por los name)
   fd.append("id_estudiante", ID_ESTUDIANTE);
 
   try {
@@ -64,7 +64,14 @@ document.getElementById("form-entrega").addEventListener("submit", async (e) => 
       body: fd,
       credentials: "include",
     });
-    if (!res.ok) throw new Error("Error al enviar");
+
+    if (!res.ok) {
+      // lee el JSON del backend si viene mensaje
+      let info = {};
+      try { info = await res.json(); } catch {}
+      throw new Error(info.error || `Error HTTP ${res.status}`);
+    }
+
     msg.textContent = "¡Enviado!";
     e.target.reset();
     cargarMisEntregas();
@@ -76,4 +83,3 @@ document.getElementById("form-entrega").addEventListener("submit", async (e) => 
 
 // Inicial
 cargarMisEntregas();
-
