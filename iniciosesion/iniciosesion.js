@@ -1,11 +1,5 @@
 // iniciosesion/iniciosesion.js
 
-// SIEMPRE apunto al mismo host que sirve el frontend (localhost o 127.0.0.7)
-const API_BASE = `http://${location.hostname}:8000`;
-
-// 1) Backend API base (tu servidor Express en 8000)
-const API_BASE = "http://localhost:8000";
-
 document.addEventListener("DOMContentLoaded", () => {
   // 2) Referencias seguras
   const form = document.querySelector("#loginForm") || document.querySelector("form");
@@ -79,4 +73,3 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
-
