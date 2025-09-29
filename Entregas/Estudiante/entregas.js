@@ -36,8 +36,8 @@ async function cargarMisEntregas() {
       <tr>
         <td>${esc(e.titulo)}</td>
         <td>${esc(e.descripcion)}</td>
-        <!-- Mostramos un enlace para DESCARGAR el archivo en lugar de abrirlo -->
-        <a href="http://localhost:8000${esc(e.archivo)}" download>Descargar</a>
+        <!-- Mostramos un enlace para VER el archivo, abre en el navegador -->
+        <td><a href="http://localhost:8000${esc(e.archivo)}" target="_blank" rel="noopener">Ver</a></td>
         <td><span class="badge badge-${esc(e.estado)}">${esc(e.estado)}</span></td>
         <td>${e.fecha ? new Date(e.fecha).toLocaleString() : ""}</td>
       </tr>`
