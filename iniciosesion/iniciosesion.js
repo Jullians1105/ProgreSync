@@ -55,7 +55,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // Opcional: consultamos /me para conocer el rol si quieres redirigir distinto
+      // Consultamos la ruta /me para obtener el rol del usuario, así podemos redirigirlo según corresponda
       const meRes = await fetch(`${API_BASE}/me`, { credentials: "include" });
       let me = null;
       try { me = await meRes.json(); } catch {}
@@ -63,8 +63,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const role = me?.user?.rol || me?.user?.role || null;
       show("Inicio de sesión correcto. Redirigiendo…", "ok");
 
-      // Redirige a la portada (o a Entregas puente si prefieres)
-      // window.location.href = "../Entregas/index.html"; // si quieres ir directo a entregas
+      // Redirige a la página de inicio "index.html"
       window.location.href = "../index.html";
     } catch (err) {
       console.error(err);
@@ -75,3 +74,4 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
