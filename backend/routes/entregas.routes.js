@@ -132,24 +132,23 @@ router.patch("/:id/estado", async (req, res) => {
     }
 
     // Actualizo el estado en la entrega
+    // Añadimos comentario_docente para persistir el comentario del docente
+    // Añadimos comentario_docente en el UPDATE para persistir lo que envía el docente
     const [result] = await pool.query(
       `UPDATE entregas
-         SET estado = ?
+         SET estado = ?, comentario_docente = ?
        WHERE id = ?`,
-      [dbEstado, id]
+      [dbEstado, comentario || null, id]
     );
-
+    
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: "Entrega no encontrada" });
     }
-
-    // Devuelvo respuesta simple
-    return res.json({ ok: true, id, estado: dbEstado });
-  } catch (err) {
-    console.error("Error PATCH /api/entregas/:id/estado:", err);
-    return res.status(500).json({ error: "No se pudo actualizar el estado" });
-  }
-});
+    
+    // Añadimos el comentario en la respuesta JSON para poder mostrarlo en el front
+    return res.json({ ok: true, id, estado: dbEstado, comentario: comentario || null });
+    
+    });
 
 
 export default router;
