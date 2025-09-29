@@ -49,6 +49,15 @@
     <div class="row" id="grid">
       <!-- JS inyecta aquí las tarjetas de entregas por revisar -->
     </div>
+
+    <!-- Bloque para mostrar las entregas aprobadas -->
+    <h2 class="h5 mt-4">Entregas aprobadas</h2>
+    <div class="row" id="grid-aprobadas"></div>
+    
+    <!-- Bloque para mostrar las entregas rechazadas -->
+    <h2 class="h5 mt-4">Entregas rechazadas</h2>
+    <div class="row" id="grid-rechazadas"></div>
+
   </main>
 
   <!-- Guard de rol: SOLO docentes/admin pueden entrar a esta vista -->
@@ -93,9 +102,18 @@
       msg.textContent = "Cargando…";
 
       try {
-        const res = await fetch(`${API}/pendientes`);
+        // Añadimos credentials para que viaje mi cookie de sesión en este GET
+        const res = await fetch(`${API}/pendientes`, { credentials: "include" });
+
         if (!res.ok) throw new Error("No fue posible obtener pendientes");
         const data = await res.json();
+
+        // Añadimos fallback visual para cuando no haya items
+        if (!Array.isArray(data) || data.length === 0) {
+          grid.innerHTML = `<div class="col-12"><p class="text-muted">No hay entregas en esta sección</p></div>`;
+          return;
+        }
+
 
         if (!Array.isArray(data) || data.length === 0) {
           grid.innerHTML = `<div class="col-12"><p class="text-muted">No hay entregas pendientes</p></div>`;
@@ -143,6 +161,89 @@
       }
     }
 
+    
+    // Añadimos esta función para cargar las aprobadas y mostrar el comentario del docente
+async function cargarAprobadas() {
+  const grid = document.getElementById("grid-aprobadas");
+  try {
+    const res = await fetch(`${API}/aprobadas`, { credentials: "include" });
+    if (!res.ok) throw new Error("No fue posible obtener aprobadas");
+    const data = await res.json();
+
+    // Añadimos fallback visual para cuando no haya items
+        if (!Array.isArray(data) || data.length === 0) {
+          grid.innerHTML = `<div class="col-12"><p class="text-muted">No hay entregas en esta sección</p></div>`;
+          return;
+        }
+
+    grid.innerHTML = data.map((e) => {
+      // Añadimos normalización para construir el link del archivo contra el backend
+      const path = String(e.archivo || "");
+      const normalized = path.startsWith("/") ? path : `/${path}`;
+      const hrefArchivo = `${API_ORIGIN}${normalized}`;
+
+      return `
+        <div class="col-md-4">
+          <div class="card mb-3 border-success">
+            <div class="card-body">
+              <h6 class="card-title mb-1">${esc(e.titulo)}</h6>
+              <p class="card-text small mb-1">
+                <a href="${hrefArchivo}" target="_blank" rel="noopener">Ver archivo</a>
+              </p>
+              <p class="card-text small text-success mb-1">
+                <strong>Comentario:</strong> ${esc(e.comentario_docente ?? "—")}
+              </p>
+              <small class="text-muted">Enviado: ${new Date(e.fecha).toLocaleString()}</small>
+            </div>
+          </div>
+        </div>`;
+    }).join("");
+  } catch (e) {
+    grid.innerHTML = `<div class="col-12"><p class="text-danger">Error cargando aprobadas</p></div>`;
+  }
+}
+
+// Añadimos esta función para cargar las rechazadas y mostrar el comentario del docente
+async function cargarRechazadas() {
+  const grid = document.getElementById("grid-rechazadas");
+  try {
+    const res = await fetch(`${API}/rechazadas`, { credentials: "include" });
+    if (!res.ok) throw new Error("No fue posible obtener rechazadas");
+    const data = await res.json();
+
+    // Añadimos fallback visual para cuando no haya items
+        if (!Array.isArray(data) || data.length === 0) {
+          grid.innerHTML = `<div class="col-12"><p class="text-muted">No hay entregas en esta sección</p></div>`;
+          return;
+        }
+
+    grid.innerHTML = data.map((e) => {
+      const path = String(e.archivo || "");
+      const normalized = path.startsWith("/") ? path : `/${path}`;
+      const hrefArchivo = `${API_ORIGIN}${normalized}`;
+
+      return `
+        <div class="col-md-4">
+          <div class="card mb-3 border-danger">
+            <div class="card-body">
+              <h6 class="card-title mb-1">${esc(e.titulo)}</h6>
+              <p class="card-text small mb-1">
+                <a href="${hrefArchivo}" target="_blank" rel="noopener">Ver archivo</a>
+              </p>
+              <p class="card-text small text-danger mb-1">
+                <strong>Comentario:</strong> ${esc(e.comentario_docente ?? "—")}
+              </p>
+              <small class="text-muted">Enviado: ${new Date(e.fecha).toLocaleString()}</small>
+            </div>
+          </div>
+        </div>`;
+    }).join("");
+  } catch (e) {
+    grid.innerHTML = `<div class="col-12"><p class="text-danger">Error cargando rechazadas</p></div>`;
+  }
+}
+
+
     // Aprobar o rechazar una entrega
     async function resolver(id, estado) {
       const comentario = prompt(`Comentario (${estado}):`) || "";
@@ -163,7 +264,10 @@
 
         if (!res.ok) throw new Error("No se pudo registrar la revisión");
         msg.textContent = "Revisión registrada";
-        cargarPendientes();
+        // Añadimos estas recargas para mover la tarjeta y ver el comentario donde corresponde
+        await Promise.all([cargarPendientes(), cargarAprobadas(), cargarRechazadas()]);
+        
+        
       } catch (err) {
         msg.textContent = "Error al registrar la revisión";
         console.error(err);
@@ -180,8 +284,11 @@
       .getElementById("btn-cargar")
       .addEventListener("click", cargarPendientes);
 
-    // Carga inicial
+    // Añadimos cargas iniciales de todas las secciones para ver el estado completo
     cargarPendientes();
+    cargarAprobadas();
+    cargarRechazadas();
+
   </script>
 </body>
 </html>
