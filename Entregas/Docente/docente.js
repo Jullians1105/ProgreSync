@@ -12,17 +12,24 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => (
   {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]
 ));
 
-/* Construimos la URL ABSOLUTA del archivo siempre contra el backend
-   - Si e.archivo viene como "/uploads/archivo.pdf" → queda "http://localhost:8000/uploads/archivo.pdf"
-   - Si viniera como "uploads/archivo.pdf" → también lo resuelve bien
-   - Si en producción API_BASE cambia, esto se adapta solo               */
+/* Construimos la URL ABSOLUTA del archivo siempre contra el backend */
 const buildFileUrl = (pathLike) => {
   try {
     return new URL(pathLike, API_BASE).href;
   } catch {
-    // Fallback defensivo si algo extraño viene en pathLike
-    const p = String(pathLike || "");
-    return `${API_BASE}${p.startsWith("/") ? p : `/${p}`}`;
+    const p = String(pathLike || "").trim();
+    return `${API_BASE}${p.startsWith("/") ? p : (p ? `/${p}` : "")}`;
+  }
+};
+
+// Normalizamos el estado a lo que el backend espera (ajusta a tu convención)
+const mapEstadoOut = (v) => {
+  switch ((v || "").toLowerCase()) {
+    case "aprobado":   return "Aprobado";
+    case "rechazado":  return "Rechazado";
+    case "en revisión":
+    case "en revision":
+    default:           return "En revisión";
   }
 };
 
@@ -35,39 +42,55 @@ async function cargarPendientes() {
     if (!r.ok) throw new Error("HTTP " + r.status);
     const data = await r.json();
 
-    if (!data.length) {
-      grid.innerHTML = `<div class="col-12"><div class="alert alert-info">No hay entregas en revisión.</div></div>`;
+    if (!Array.isArray(data) || !data.length) {
+      grid.innerHTML = `
+        <div class="col-12">
+          <div class="alert alert-info">No hay entregas en revisión.</div>
+        </div>`;
       msg.textContent = "";
       return;
     }
 
     grid.innerHTML = data.map(e => {
-      // Armamos la URL final del archivo contra el backend
-      const hrefArchivo = buildFileUrl(e.archivo);
+      const titulo       = esc(e.titulo);
+      const estudiante   = esc(e.estudiante);
+      const email        = esc(e.estudiante_email);
+      const descripcion  = esc(e.descripcion ?? "");
+      const archivoPath  = e.archivo ?? "";
+      const hrefArchivo  = archivoPath ? buildFileUrl(archivoPath) : "";
+
+      const btnArchivo = hrefArchivo
+        ? `<a href="${esc(hrefArchivo)}" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener">Ver archivo</a>`
+        : `<button class="btn btn-outline-secondary btn-sm" disabled>Sin archivo</button>`;
+
+      // Estado actual si viene desde el backend, lo mapeamos a minúscula para select
+      const estadoActual = ((e.estado ?? "En revisión") + "").toLowerCase();
 
       return `
-      <div class="col-12 col-md-6 col-lg-4">
+      <div class="col-12 col-md-6 col-lg-4 mb-3">
         <div class="card h-100 shadow-sm">
           <div class="card-body d-flex flex-column">
-            <h5 class="card-title mb-1">${esc(e.titulo)}</h5>
-            <p class="text-muted mb-2">${esc(e.estudiante)} · ${esc(e.estudiante_email)}</p>
-            <p class="card-text small flex-grow-1">${esc(e.descripcion)}</p>
+            <h5 class="card-title mb-1">${titulo}</h5>
+            <p class="text-muted mb-2">${estudiante}${email ? ` · ${email}` : ""}</p>
+            <p class="card-text small flex-grow-1">${descripcion}</p>
 
-            <!-- Mostramos un enlace para VER el archivo, abre en otra pestaña -->
-            <td><a href="http://localhost:8000${esc(e.archivo)}" target="_blank" rel="noopener">Ver</a></td>
+            <div class="d-flex gap-2 mb-2">
+              ${btnArchivo}
+            </div>
 
             <div class="input-group mb-2">
-              <select class="form-select estado">
-                <option value="aprobado">Aprobar</option>
-                <option value="rechazado">Rechazar</option>
+              <label class="input-group-text" for="sel-${e.id}">Estado</label>
+              <select id="sel-${e.id}" class="form-select estado">
+                <option value="en revisión" ${estadoActual==="en revisión"?"selected":""}>En revisión</option>
+                <option value="aprobado"    ${estadoActual==="aprobado"?"selected":""}>Aprobado</option>
+                <option value="rechazado"   ${estadoActual==="rechazado"?"selected":""}>Rechazado</option>
               </select>
             </div>
             <textarea class="form-control comentario mb-2" placeholder="Comentario (opcional)"></textarea>
             <button class="btn btn-success w-100 btn-guardar" data-id="${e.id}">Guardar revisión</button>
           </div>
         </div>
-      </div>
-    `;
+      </div>`;
     }).join("");
 
     msg.textContent = "";
@@ -77,14 +100,16 @@ async function cargarPendientes() {
   }
 }
 
-// Guardar revisión (recuerda credentials)
+// Guardar revisión (delegación + credentials)
 grid.addEventListener("click", async (ev) => {
   const btn = ev.target.closest(".btn-guardar");
   if (!btn) return;
   const card = btn.closest(".card");
   const id = btn.dataset.id;
-  const estado = card.querySelector(".estado").value;
+  const estadoSel = card.querySelector(".estado").value; // "aprobado"/"rechazado"/"en revisión"
   const comentario = card.querySelector(".comentario").value.trim();
+
+  const estado = mapEstadoOut(estadoSel);
 
   btn.disabled = true;
   btn.textContent = "Guardando…";
@@ -96,7 +121,14 @@ grid.addEventListener("click", async (ev) => {
       credentials: "include",
       body: JSON.stringify({ estado, comentario }),
     });
-    if (!r.ok) throw new Error("HTTP " + r.status);
+
+    if (!r.ok) {
+      // Intentamos mostrar mensaje del backend si viene en JSON
+      let detail = "";
+      try { detail = (await r.json())?.message || ""; } catch {}
+      throw new Error(`HTTP ${r.status}${detail ? ` – ${detail}` : ""}`);
+    }
+
     btn.textContent = "Guardado ✅";
     setTimeout(cargarPendientes, 400);
   } catch (err) {
