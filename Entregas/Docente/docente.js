@@ -54,7 +54,7 @@ async function cargarPendientes() {
             <p class="card-text small flex-grow-1">${esc(e.descripcion)}</p>
 
             <!-- Mostramos un enlace para VER el archivo, abre en otra pestaña -->
-            <a class="mb-2" href="${esc(hrefArchivo)}" target="_blank" rel="noopener">Ver</a>
+            <td><a href="http://localhost:8000${esc(e.archivo)}" target="_blank" rel="noopener">Ver</a></td>
 
             <div class="input-group mb-2">
               <select class="form-select estado">
