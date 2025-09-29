@@ -23,7 +23,7 @@
   <main class="container py-4">
     <h1 class="h3 mb-4">Mis Entregas — Estudiante</h1>
 
-    <!-- IMPORTANTE: agregar name a los inputs -->
+    <!-- Añadí name a los inputs para que el backend reciba titulo, descripcion y archivo -->
     <form id="form-entrega" class="my-3">
       <input id="titulo" name="titulo" class="form-control mb-2" placeholder="Título" required />
       <textarea id="descripcion" name="descripcion" class="form-control mb-2" placeholder="Descripción"></textarea>
@@ -36,10 +36,13 @@
     <table class="table table-striped">
       <thead class="table-dark">
         <tr>
-          <!-- Añadimos esta cabecera para mostrar el comentario del docente -->
-          <th>Comentario</th>
-          
-          <th>Título</th><th>Descripción</th><th>Archivo</th><th>Estado</th><th>Fecha</th>
+          <!-- Alineo el orden de columnas con el tbody que pinto desde entregas.js -->
+          <th>Título</th>
+          <th>Descripción</th>
+          <th>Archivo</th>
+          <th>Estado</th>
+          <th>Comentario</th> <!-- Añadí esta columna para mostrar el comentario del docente -->
+          <th>Fecha</th>
         </tr>
       </thead>
       <tbody id="tbody-entregas"></tbody>
