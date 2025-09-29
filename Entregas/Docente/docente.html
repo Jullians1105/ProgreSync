@@ -62,6 +62,12 @@
     // API base (ajústala si cambiaste el puerto o ruta en tu backend)
     const API = "http://localhost:8000/api/entregas";
 
+    // Añadimos esta asignación para tener mi sesión disponible en este script no-module
+    (window.SESION_PROMISE || Promise.resolve(null))
+      .then(s => { window.SESION = s; })
+      .catch(() => {});
+
+
     // Añadimos API_ORIGIN para quedarme solo con el origen del backend (http://localhost:8000)
     // y así construir enlaces absolutos a los PDFs.
     const API_ORIGIN = new URL(API).origin;
@@ -69,6 +75,15 @@
     const ID_DOCENTE = window.SESION?.id;
 
     const esc = (s) => String(s ?? "");
+
+    // Añadimos este mapeo para enviar el estado con la convención que espera el backend
+    const mapEstado = (v) => {
+      v = String(v || "").toLowerCase();
+      if (v === "aprobado")  return "Aprobado";
+      if (v === "rechazado") return "Rechazado";
+      return "En revisión";
+    };
+
 
     // Cargo entregas pendientes para revisión
     async function cargarPendientes() {
@@ -135,15 +150,16 @@
       msg.textContent = "Enviando revisión…";
 
       try {
-        const res = await fetch(`${API}/${id}/revision`, {
-          method: "POST",
+        const res = await fetch(`${API}/${id}/estado`, {
+          method: "PATCH",
           headers: { "Content-Type": "application/json" },
+          credentials: "include", // Añadimos credentials para enviar la cookie de sesión
           body: JSON.stringify({
-            id_docente: ID_DOCENTE,
-            nuevo_estado: estado,
+            estado: mapEstado(estado), // Añadimos el estado con la convención del backend
             comentario,
           }),
         });
+
 
         if (!res.ok) throw new Error("No se pudo registrar la revisión");
         msg.textContent = "Revisión registrada";
