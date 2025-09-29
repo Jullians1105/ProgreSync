@@ -67,10 +67,7 @@ router.get("/mis/:id_estudiante", async (req, res) => {
   try {
     const { id_estudiante } = req.params;
     const [rows] = await pool.query(
-      
-      //Añadimos comentario_docente para enviarlo al front del estudiante
-      SELECT id, titulo, descripcion, archivo, estado, comentario_docente, fecha
-
+      `SELECT id, titulo, descripcion, archivo, estado, comentario_docente, fecha
        FROM entregas
        WHERE id_estudiante = ?
        ORDER BY fecha DESC`,
