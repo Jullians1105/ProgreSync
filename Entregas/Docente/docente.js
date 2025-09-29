@@ -30,7 +30,8 @@ async function cargarPendientes() {
             <h5 class="card-title mb-1">${esc(e.titulo)}</h5>
             <p class="text-muted mb-2">${esc(e.estudiante)} · ${esc(e.estudiante_email)}</p>
             <p class="card-text small flex-grow-1">${esc(e.descripcion)}</p>
-            <a class="mb-2" href="${esc(e.archivo)}" target="_blank" rel="noopener">Ver archivo</a>
+            <a class="mb-2" href="${esc(e.archivo)}" download>Descargar archivo</a>
+      
 
             <div class="input-group mb-2">
               <select class="form-select estado">
