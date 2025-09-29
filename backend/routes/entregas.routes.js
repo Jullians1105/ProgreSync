@@ -103,12 +103,54 @@ router.get("/pendientes", async (_req, res) => {
   }
 });
 
-/* ────────────────────── (Opcional) Cambiar estado ──────────────────────
-   PATCH /api/entregas/:id/estado  { estado, comentario? }
-   (Deja preparado para futura vista docente)
+/* ────────────────────── Cambiar estado (Docente) ──────────────────────
+   PATCH /api/entregas/:id/estado
+   Body JSON: { estado: "Aprobado" | "Rechazado" | "En revisión", comentario? }
+   Nota: mapeo a BD: "en_revision" | "aprobado" | "rechazado"
 */
-// import { requireRole } from somewhere if quieres protegerla
-// router.patch("/:id/estado", requireRole("docente", "admin"), async (req, res) => { ... });
+router.patch("/:id/estado", async (req, res) => {
+  try {
+    // (Opcional) Si quieres validar rol, aquí puedes revisar req.session.user.rol
+    // const user = req.session?.user;
+    // if (!user || !["docente", "admin"].includes(user.rol || user.role)) {
+    //   return res.status(403).json({ error: "Sin permisos" });
+    // }
+
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "ID inválido" });
+
+    // Mapeo del estado que viene del front a tus valores en BD
+    const estadoIn = String(req.body?.estado || "").toLowerCase();
+    let dbEstado = "en_revision";
+    if (estadoIn.includes("aprob")) dbEstado = "aprobado";
+    else if (estadoIn.includes("rechaz")) dbEstado = "rechazado";
+
+    // Comentario es opcional. Si no tienes columna, no lo guardo (solo lo registro en logs)
+    const comentario = String(req.body?.comentario || "").trim();
+    if (comentario) {
+      console.log(`[DOCENTE] Comentario en revisión entrega ${id}:`, comentario);
+    }
+
+    // Actualizo el estado en la entrega
+    const [result] = await pool.query(
+      `UPDATE entregas
+         SET estado = ?
+       WHERE id = ?`,
+      [dbEstado, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Entrega no encontrada" });
+    }
+
+    // Devuelvo respuesta simple
+    return res.json({ ok: true, id, estado: dbEstado });
+  } catch (err) {
+    console.error("Error PATCH /api/entregas/:id/estado:", err);
+    return res.status(500).json({ error: "No se pudo actualizar el estado" });
+  }
+});
+
 
 export default router;
 
