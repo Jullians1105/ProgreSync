@@ -137,7 +137,6 @@
                 <p class="card-text small text-muted mb-1">${esc(e.descripcion ?? "—")}</p>
 
 
-                <p class="card-text small text-muted mb-2">${esc(e.descripcion)}</p>
                 <p class="mb-3">
                   <!-- Añadimos el uso de API_ORIGIN para que abra desde backend -->
                   <a href="${hrefArchivo}" target="_blank" rel="noopener">Ver archivo</a>
@@ -191,6 +190,7 @@ async function cargarAprobadas() {
             <div class="card-body">
               <h6 class="card-title mb-1">${esc(e.titulo)}</h6>
               <p class="text-muted mb-1">${esc(e.estudiante)} · ${esc(e.estudiante_email)}</p>
+              <p class="card-text small text-muted mb-1">${esc(e.descripcion ?? "—")}</p>
               <p class="card-text small mb-1">
                 <a href="${hrefArchivo}" target="_blank" rel="noopener">Ver archivo</a>
               </p>
