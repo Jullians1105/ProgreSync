@@ -30,15 +30,12 @@ const upload = multer({
 });
 
 /* ────────────────────── Diagnóstico ────────────────────── */
-router.get("/__ping", (_req, res) => res.json({ ok: true, from: "entregas.routes.js" }));
+router.get("/__ping", (_req, res) =>
+  res.json({ ok: true, from: "entregas.routes.js" })
+);
 
 /* ────────────────────── Crear entrega (con archivo) ──────────────────────
    POST /api/entregas
-   FormData:
-   - titulo (string)       (required)
-   - descripcion (string)  (optional)
-   - id_estudiante (int)   (required)
-   - archivo (file)        (required)
 */
 router.post("/", upload.single("archivo"), async (req, res) => {
   try {
@@ -79,7 +76,9 @@ router.get("/mis/:id_estudiante", async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error("Error GET /api/entregas/mis:", err);
-    res.status(500).json({ error: "No se pudieron obtener las entregas" });
+    res
+      .status(500)
+      .json({ error: "No se pudieron obtener las entregas" });
   }
 });
 
@@ -99,57 +98,106 @@ router.get("/pendientes", async (_req, res) => {
     res.json(rows);
   } catch (err) {
     console.error("Error GET /api/entregas/pendientes:", err);
-    res.status(500).json({ error: "No se pudieron obtener las pendientes" });
+    res
+      .status(500)
+      .json({ error: "No se pudieron obtener las pendientes" });
+  }
+});
+
+/* ────────────────────── Entregas aprobadas ──────────────────────
+   GET /api/entregas/aprobadas
+*/
+router.get("/aprobadas", async (_req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT e.id, e.titulo, e.descripcion, e.archivo, e.estado, e.fecha,
+              e.comentario_docente,
+              u.nombre AS estudiante, u.email AS estudiante_email
+       FROM entregas e
+       JOIN usuarios u ON u.id = e.id_estudiante
+       WHERE e.estado = 'aprobado'
+       ORDER BY e.fecha DESC`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Error GET /api/entregas/aprobadas:", err);
+    res
+      .status(500)
+      .json({ error: "No se pudieron obtener las aprobadas" });
+  }
+});
+
+/* ────────────────────── Entregas rechazadas ──────────────────────
+   GET /api/entregas/rechazadas
+*/
+router.get("/rechazadas", async (_req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT e.id, e.titulo, e.descripcion, e.archivo, e.estado, e.fecha,
+              e.comentario_docente,
+              u.nombre AS estudiante, u.email AS estudiante_email
+       FROM entregas e
+       JOIN usuarios u ON u.id = e.id_estudiante
+       WHERE e.estado = 'rechazado'
+       ORDER BY e.fecha DESC`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Error GET /api/entregas/rechazadas:", err);
+    res
+      .status(500)
+      .json({ error: "No se pudieron obtener las rechazadas" });
   }
 });
 
 /* ────────────────────── Cambiar estado (Docente) ──────────────────────
    PATCH /api/entregas/:id/estado
-   Body JSON: { estado: "Aprobado" | "Rechazado" | "En revisión", comentario? }
-   Nota: mapeo a BD: "en_revision" | "aprobado" | "rechazado"
 */
 router.patch("/:id/estado", async (req, res) => {
   try {
-    // (Opcional) Si quieres validar rol, aquí puedes revisar req.session.user.rol
-    // const user = req.session?.user;
-    // if (!user || !["docente", "admin"].includes(user.rol || user.role)) {
-    //   return res.status(403).json({ error: "Sin permisos" });
-    // }
-
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "ID inválido" });
 
-    // Mapeo del estado que viene del front a tus valores en BD
+    // Mapeo del estado del front → valores en BD
     const estadoIn = String(req.body?.estado || "").toLowerCase();
     let dbEstado = "en_revision";
     if (estadoIn.includes("aprob")) dbEstado = "aprobado";
     else if (estadoIn.includes("rechaz")) dbEstado = "rechazado";
 
-    // Comentario es opcional. Si no tienes columna, no lo guardo (solo lo registro en logs)
+    // Comentario opcional
     const comentario = String(req.body?.comentario || "").trim();
     if (comentario) {
-      console.log(`[DOCENTE] Comentario en revisión entrega ${id}:`, comentario);
+      console.log(
+        `[DOCENTE] Comentario en revisión entrega ${id}:`,
+        comentario
+      );
     }
 
-    // Actualizo el estado en la entrega
-    // Añadimos comentario_docente para persistir el comentario del docente
-    // Añadimos comentario_docente en el UPDATE para persistir lo que envía el docente
+    // Update con comentario_docente
     const [result] = await pool.query(
       `UPDATE entregas
          SET estado = ?, comentario_docente = ?
        WHERE id = ?`,
       [dbEstado, comentario || null, id]
     );
-    
+
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: "Entrega no encontrada" });
     }
-    
-    // Añadimos el comentario en la respuesta JSON para poder mostrarlo en el front
-    return res.json({ ok: true, id, estado: dbEstado, comentario: comentario || null });
-    
-    });
 
+    // Respuesta
+    return res.json({
+      ok: true,
+      id,
+      estado: dbEstado,
+      comentario: comentario || null,
+    });
+  } catch (err) {
+    console.error("Error PATCH /api/entregas/:id/estado:", err);
+    return res
+      .status(500)
+      .json({ error: "No se pudo actualizar el estado" });
+  }
+});
 
 export default router;
-
