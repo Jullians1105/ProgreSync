@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Entregas</title>
+  <style>
+    body {
+      font-family: system-ui, Segoe UI, Arial;
+      margin: 24px;
+    }
+  </style>
+</head>
+<body>
+  <p>Redirigiendo a tu sección de Entregas…</p>
+  <script>
+    // Backend usando el MISMO host del frontend (localhost o 127.0.0.7)
+    const API_BASE = `http://${location.hostname}:8000`;
+
+    (async () => {
+      try {
+        const r = await fetch(`${API_BASE}/me`, { credentials: "include" });
+        if (!r.ok) {
+          location.href = "/iniciosesion/iniciosesion.html";
+          return;
+        }
+        const me = await r.json();
+        const rol = me?.user?.rol || me?.user?.role;
+
+        switch (rol) {
+          case "estudiante":
+            location.href = "Estudiante/entregas.html";
+            break;
+          case "docente":
+            location.href = "Docente/docente.html";
+            break;
+          case "admin":
+            location.href = "/index.html"; // 👈 ahora admin va al inicio
+            break;
+          default:
+            location.href = "/index.html"; // fallback
+        }
+      } catch (e) {
+        console.error("Error en redirección de entregas:", e);
+        location.href = "/index.html";
+      }
+    })();
+  </script>
+</body>
+</html>
+
