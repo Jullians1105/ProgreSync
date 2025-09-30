@@ -108,7 +108,7 @@ app.get("/db-test", async (_req, res) => {
 });
 
 /* =========================
-   Autenticación
+  Autenticación
    ========================= */
 
 // Login
@@ -163,7 +163,7 @@ app.post("/logout", (req, res) => {
 });
 
 /* =========================
-   Gestión de usuarios
+  Gestión de usuarios
    ========================= */
 
 // Crear usuario (solo admin)
@@ -213,7 +213,7 @@ app.get("/usuarios", requireRole("admin"), async (_req, res) => {
 });
 
 /* =========================
-   Archivos subidos estáticos
+  Archivos subidos estáticos
    ========================= */
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
