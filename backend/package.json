@@ -7,13 +7,19 @@
     "start": "node app.js"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "cors": "^2.8.5",
-    "express-session": "^1.17.3",
     "bcryptjs": "^2.4.3",
-    "mysql2": "^3.9.7"
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "express-session": "^1.18.2",
+    "multer": "^2.0.2",
+    "mysql2": "^3.15.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.0"
-  }
+    "nodemon": "^3.1.10"
+  },
+  "description": "",
+  "main": "app.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }
