@@ -34,13 +34,13 @@ const ALLOWED_ORIGINS = [
   "http://localhost:5500",
   "http://127.0.0.1:5500",
   "http://127.0.0.7:5500", // Live Server
-  "http://localhost:5173", // Vite
+  "http://localhost:5173", 
 ];
 
 app.use(
   cors({
     origin: (origin, cb) => {
-      if (!origin) return cb(null, true); // permite Postman/Thunder
+      if (!origin) return cb(null, true); 
       if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
       return cb(new Error("Not allowed by CORS: " + origin));
     },
