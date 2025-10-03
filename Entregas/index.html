@@ -27,7 +27,7 @@
           return;
         }
         const me = await r.json();
-        const rol = me?.user?.rol || me?.user?.role;
+        const rol = me?.user?.rol || me?.user?.role; //Extraemos el usuario que puede venir como "rol" o "role"
 
         switch (rol) {
           case "estudiante":
