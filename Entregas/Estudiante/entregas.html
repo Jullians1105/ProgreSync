@@ -49,13 +49,13 @@
     </table>
   </main>
 
-  <!-- Guard de rol -->
+ <!-- Aquí verifico que solo los usuarios con rol "estudiante" puedan entrar a esta página, si el rol no corresponde, guard.js los redirige automáticamente al inicio (index.html). -->
   <script type="module">
     import { requireRole } from "/guard.js";
-    window.SESION_PROMISE = requireRole(["estudiante"]);
+    window.SESION_PROMISE = requireRole(["estudiante"]);//Si el usuario no cumple automáticamente se envía al inicio
   </script>
 
-  <!-- Lógica -->
+  <!-- Aquí enlazo el archivo entregas.js, donde programé toda la lógica para que el estudiante pueda ver y gestionar sus entregas. -->
   <script type="module" src="./entregas.js"></script>
 </body>
 </html>

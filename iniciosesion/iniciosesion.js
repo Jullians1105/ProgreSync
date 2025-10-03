@@ -16,7 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
       type === "error" ? "#b00020" : type === "ok" ? "#0a7c2f" : "#444";
   };
 
-  // Por si llegaron query params, los rellenamos (no es obligatorio)
+  // Por si llegaron query params, los rellenamos
   try {
     const q = new URLSearchParams(location.search);
     if (q.get("email")) emailInput.value = q.get("email");
@@ -43,7 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch(`${API_BASE}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include", // 👈 para que la cookie de sesión viaje
+        credentials: "include", // para que la cookie de sesión viaje
         body: JSON.stringify({ email, password }),
       });
 
@@ -74,4 +74,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
+
 
