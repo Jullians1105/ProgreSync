@@ -43,7 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch(`${API_BASE}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include", // 👈 para que la cookie de sesión viaje
+        credentials: "include", // para que la cookie de sesión viaje
         body: JSON.stringify({ email, password }),
       });
 
@@ -74,5 +74,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
 
 
