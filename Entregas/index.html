@@ -20,6 +20,8 @@
     (async () => {
       try {
         const r = await fetch(`${API_BASE}/me`, { credentials: "include" });
+
+        //Si la respuesta no es OK significa que no hay usuario logueado entonces manda al login (iniciosesion.html).
         if (!r.ok) {
           location.href = "/iniciosesion/iniciosesion.html";
           return;
