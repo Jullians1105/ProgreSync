@@ -21,5 +21,27 @@ export const pool = await mysql.createPool({
 
   // Número máximo de consultas que pueden quedarse en espera.
   // 0 significa que no hay límite (prácticamente nunca se bloquea).
-  queueLimit: 0
+  queueLimit: 0,
+
+    // ⬇️ Hace que las fechas salgan como string y los decimales como Number
+  dateStrings: true,
+
+
+  decimalNumbers: true,
+
+  // ⬇️ Conversión segura de BIGINT/DECIMAL a algo serializable por JSON
+  typeCast(field, next) {
+    // DECIMAL/NEWDECIMAL → Number (si no es null)
+    if (field.type === "NEWDECIMAL" || field.type === "DECIMAL") {
+      const val = field.string();
+      return val === null ? null : Number(val);
+    }
+    // LONGLONG = BIGINT → Number si es “safe”, si no, deja string
+    if (field.type === "LONGLONG") {
+      const val = field.string();                // string siempre serializable
+      const asNum = Number(val);
+      return Number.isSafeInteger(asNum) ? asNum : val;
+    }
+    return next();
+  }
 });

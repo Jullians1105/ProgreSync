@@ -210,9 +210,12 @@ app.post("/usuarios", requireRole("admin"), async (req, res) => {
 // Listar usuarios (solo admin)
 app.get("/usuarios", requireRole("admin"), async (_req, res) => {
   try {
-    const [rows] = await pool.query(
-      "SELECT id, nombre, email, rol, created_at FROM usuarios ORDER BY id"
-    );
+const [rows] = await pool.query(`
+  SELECT id, nombre, email, rol, estado
+  FROM usuarios
+  ORDER BY id ASC
+`);
+
     return res.json({ ok: true, usuarios: rows });
   } catch (err) {
     console.error("Error listando usuarios:", err);
