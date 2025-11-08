@@ -24,6 +24,53 @@
   <main class="container py-4">
     <h1 class="h3 mb-4">Mis Entregas — Estudiante</h1>
 
+    <!-- 🔍 Barra de filtros (solo UI, sin JS aún) -->
+    <section class="card shadow-sm border-0 mb-4">
+      <div class="card-body">
+        <form id="filtros-form" class="row g-3 align-items-end">
+          <!-- Estado -->
+          <div class="col-12 col-md-4">
+            <label for="f-estado" class="form-label mb-1">Estado</label>
+            <select id="f-estado" class="form-select">
+              <option value="">Todos</option>
+              <option value="aprobado">Aprobado</option>
+              <option value="rechazado">Rechazado</option>
+              <option value="en_revision">En revisión</option>
+            </select>
+            <div class="form-text">Filtra por el estado actual de tu entrega.</div>
+          </div>
+
+          <!-- Fecha desde -->
+          <div class="col-12 col-sm-6 col-md-3">
+            <label for="f-desde" class="form-label mb-1">Desde</label>
+            <input id="f-desde" type="date" class="form-control" />
+          </div>
+
+          <!-- Fecha hasta -->
+          <div class="col-12 col-sm-6 col-md-3">
+            <label for="f-hasta" class="form-label mb-1">Hasta</label>
+            <input id="f-hasta" type="date" class="form-control" />
+          </div>
+
+          <!-- Botones -->
+          <div class="col-12 col-md-2 d-grid d-md-flex gap-2">
+            <button id="f-aplicar" type="button" class="btn btn-dark w-100">Aplicar</button>
+            <button id="f-limpiar" type="button" class="btn btn-outline-secondary w-100">Limpiar</button>
+          </div>
+        </form>
+
+        <!-- Resumen / contador de resultados -->
+        <div class="mt-3 d-flex flex-wrap align-items-center gap-2">
+          <small id="filtros-resumen" class="text-muted">
+            Mostrando todas las entregas.
+          </small>
+          <span class="badge text-bg-success">Aprobado</span>
+          <span class="badge text-bg-danger">Rechazado</span>
+          <span class="badge text-bg-warning text-dark">En revisión</span>
+        </div>
+      </div>
+    </section>
+
     <!-- Formulario de nueva entrega -->
     <form id="form-entrega" class="my-3">
       <input id="titulo" name="titulo" class="form-control mb-2" placeholder="Título" required />
@@ -43,14 +90,13 @@
           <th>Estado</th>
           <th>Comentario</th>
           <th>Fecha</th>
-          <th>Acciones</th> <!-- ✅ NUEVA COLUMNA -->
+          <th>Acciones</th>
         </tr>
       </thead>
       <tbody id="tbody-entregas"></tbody>
     </table>
 
-    <!-- ✅ Plantilla de fila con botón "Ver historial" 
-         Tu JS la clonará y reemplazará los spans/datos -->
+    <!-- Plantilla de fila con botón "Ver historial" -->
     <template id="tpl-fila-entrega">
       <tr>
         <td><span class="e-titulo"></span></td>
@@ -68,45 +114,45 @@
         </td>
       </tr>
     </template>
+
     <!-- Modal: Historial de entrega -->
-<div class="modal fade" id="modalHistorial" tabindex="-1" aria-labelledby="modalHistorialLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="modalHistorialLabel">Historial de la entrega</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-      </div>
-      <div class="modal-body p-0">
-        <!-- Loader -->
-        <div id="historial-loader" class="p-4">
-          <div class="d-flex align-items-center">
-            <div class="spinner-border me-2" role="status" aria-hidden="true"></div>
-            <strong>Cargando historial…</strong>
+    <div class="modal fade" id="modalHistorial" tabindex="-1" aria-labelledby="modalHistorialLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="modalHistorialLabel">Historial de la entrega</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body p-0">
+            <!-- Loader -->
+            <div id="historial-loader" class="p-4">
+              <div class="d-flex align-items-center">
+                <div class="spinner-border me-2" role="status" aria-hidden="true"></div>
+                <strong>Cargando historial…</strong>
+              </div>
+            </div>
+
+            <!-- Contenido -->
+            <div id="historial-contenido" class="d-none">
+              <ul id="historial-lista" class="list-group list-group-flush"></ul>
+            </div>
+
+            <!-- Vacío -->
+            <div id="historial-vacio" class="p-4 d-none text-muted">
+              Sin movimientos en el historial.
+            </div>
+
+            <!-- Error -->
+            <div id="historial-error" class="p-4 d-none text-danger">
+              Error al cargar el historial.
+            </div>
+          </div>
+          <div class="modal-footer">
+            <small class="text-muted">El historial es de solo lectura.</small>
           </div>
         </div>
-
-        <!-- Contenido -->
-        <div id="historial-contenido" class="d-none">
-          <ul id="historial-lista" class="list-group list-group-flush"></ul>
-        </div>
-
-        <!-- Vacío -->
-        <div id="historial-vacio" class="p-4 d-none text-muted">
-          Sin movimientos en el historial.
-        </div>
-
-        <!-- Error -->
-        <div id="historial-error" class="p-4 d-none text-danger">
-          Error al cargar el historial.
-        </div>
-      </div>
-      <div class="modal-footer">
-        <small class="text-muted">El historial es de solo lectura.</small>
       </div>
     </div>
-  </div>
-</div>
-
   </main>
 
   <!-- Guard de rol -->

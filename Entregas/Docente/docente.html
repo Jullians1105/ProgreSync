@@ -33,7 +33,54 @@
 
   <!-- Contenido -->
   <main class="container py-4">
-    <h1 class="h3 mb-4">Panel del Docente</h1>
+    <h1 class="h3 mb-3">Panel del Docente</h1>
+
+    <!-- 🔍 Barra de filtros (Docente) -->
+    <section class="card shadow-sm border-0 mb-3">
+      <div class="card-body">
+        <form id="filtros-doc-form" class="row g-3 align-items-end">
+          <!-- Estado -->
+          <div class="col-12 col-md-4">
+            <label for="f-doc-estado" class="form-label mb-1">Estado</label>
+            <select id="f-doc-estado" class="form-select">
+              <option value="">Todos</option>
+              <option value="en_revision">En revisión (pendientes)</option>
+              <option value="aprobado">Aprobado</option>
+              <option value="rechazado">Rechazado</option>
+            </select>
+            <div class="form-text">Filtra por estado en todas las secciones.</div>
+          </div>
+
+          <!-- Fecha desde -->
+          <div class="col-12 col-sm-6 col-md-3">
+            <label for="f-doc-desde" class="form-label mb-1">Desde</label>
+            <input id="f-doc-desde" type="date" class="form-control" />
+          </div>
+
+          <!-- Fecha hasta -->
+          <div class="col-12 col-sm-6 col-md-3">
+            <label for="f-doc-hasta" class="form-label mb-1">Hasta</label>
+            <input id="f-doc-hasta" type="date" class="form-control" />
+          </div>
+
+          <!-- Botones -->
+          <div class="col-12 col-md-2 d-grid d-md-flex gap-2">
+            <button id="f-doc-aplicar" type="button" class="btn btn-dark w-100">Aplicar</button>
+            <button id="f-doc-limpiar" type="button" class="btn btn-outline-secondary w-100">Limpiar</button>
+          </div>
+        </form>
+
+        <!-- Resumen / contador de resultados -->
+        <div class="mt-3 d-flex flex-wrap align-items-center gap-2">
+          <small id="filtros-doc-resumen" class="text-muted">
+            Mostrando todas las entregas (sin filtros).
+          </small>
+          <span class="badge text-bg-warning text-dark">En revisión</span>
+          <span class="badge text-bg-success">Aprobado</span>
+          <span class="badge text-bg-danger">Rechazado</span>
+        </div>
+      </div>
+    </section>
 
     <div class="d-flex align-items-center gap-2 mb-3">
       <button class="btn btn-primary" id="btn-cargar">Cargar pendientes</button>
@@ -41,6 +88,7 @@
     </div>
 
     <!-- Pendientes -->
+    <h2 class="h5 mt-2">Entregas pendientes (en revisión)</h2>
     <div class="row" id="grid"></div>
 
     <!-- Aprobadas -->
@@ -100,7 +148,18 @@
       .then(s => { window.SESION = s; })
       .catch(() => {});
     const API_ORIGIN = new URL(API).origin;
+
+    /* =================== Utilidades =================== */
     const esc = (s) => String(s ?? "");
+    const normalizaEstado = (v="") => String(v).toLowerCase().trim().replace(/\s+/g, "_");
+    const soloFecha = (d) => {
+      const dt = d instanceof Date ? d : new Date(d);
+      if (isNaN(dt)) return "";
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth()+1).padStart(2,"0");
+      const day = String(dt.getDate()).padStart(2,"0");
+      return `${y}-${m}-${day}`;
+    };
     const mapEstado = (v) => {
       v = String(v || "").toLowerCase();
       if (v === "aprobado")  return "Aprobado";
@@ -108,6 +167,7 @@
       return "En revisión";
     };
 
+    /* =================== Modal Historial =================== */
     function setHistorialState(state /* 'loading'|'ok'|'empty'|'error' */) {
       const elLoader = document.getElementById("historial-loader");
       const elCont   = document.getElementById("historial-contenido");
@@ -120,7 +180,6 @@
     }
 
     function renderHistorial(items) {
-      const esc = (s) => String(s ?? "");
       const ul = document.getElementById("historial-lista");
       ul.innerHTML = items.map((it) => {
         const fecha = it.fecha ? new Date(it.fecha).toLocaleString() : "";
@@ -179,7 +238,7 @@
       new window.bootstrap.Modal(modalEl).show();
     }
 
-    // ====== Delegación de clicks para el botón "Historial" en todas las tarjetas ======
+    // Delegación de clicks para botón "Historial"
     document.addEventListener("click", (ev) => {
       const btn = ev.target.closest(".btn-historial");
       if (!btn) return;
@@ -188,6 +247,146 @@
       abrirModalHistorial(id, titulo);
     });
 
+    /* =================== Cache y filtros =================== */
+    const CACHE = {
+      pendientes: [],
+      aprobadas: [],
+      rechazadas: [],
+    };
+
+    function pasaFiltro(item, selEstado, dDesde, dHasta) {
+      // Estado (normalizado)
+      if (selEstado) {
+        const estItem = normalizaEstado(item.estado || (
+          // fallback por sección si backend no trae estado explícito
+          item._seccion || ""
+        ));
+        if (estItem !== selEstado) return false;
+      }
+      // Fecha inclusiva
+      if (dDesde || dHasta) {
+        const dItem = item.fecha ? new Date(item.fecha) : null;
+        if (!dItem || isNaN(dItem)) return false;
+        if (dDesde && dItem < dDesde) return false;
+        if (dHasta && dItem > dHasta) return false;
+      }
+      return true;
+    }
+
+    function setResumenDoc() {
+      const el = document.getElementById("filtros-doc-resumen");
+      if (!el) return;
+      const selEstado = document.getElementById("f-doc-estado")?.value || "";
+      const desde = document.getElementById("f-doc-desde")?.value || "";
+      const hasta = document.getElementById("f-doc-hasta")?.value || "";
+
+      const partes = [];
+      if (selEstado) partes.push(`estado: ${selEstado === "en_revision" ? "en revisión" : selEstado}`);
+      if (desde) partes.push(`desde: ${desde}`);
+      if (hasta) partes.push(`hasta: ${hasta}`);
+      const filtrosTxt = partes.length ? `(${partes.join(" · ")})` : "(sin filtros)";
+
+      // Conteos filtrados
+      const dDesde = desde ? new Date(desde + "T00:00:00") : null;
+      const dHasta = hasta ? new Date(hasta + "T23:59:59") : null;
+
+      const pV = CACHE.pendientes.filter(x => pasaFiltro({ ...x, _seccion: "en_revision" }, selEstado, dDesde, dHasta)).length;
+      const aV = CACHE.aprobadas.filter(x => pasaFiltro({ ...x, _seccion: "aprobado"    }, selEstado, dDesde, dHasta)).length;
+      const rV = CACHE.rechazadas.filter(x => pasaFiltro({ ...x, _seccion: "rechazado"   }, selEstado, dDesde, dHasta)).length;
+
+      const pT = CACHE.pendientes.length;
+      const aT = CACHE.aprobadas.length;
+      const rT = CACHE.rechazadas.length;
+
+      el.textContent = `Pendientes: ${pV}/${pT} · Aprobadas: ${aV}/${aT} · Rechazadas: ${rV}/${rT} ${filtrosTxt}.`;
+    }
+
+    /* =================== Render por sección =================== */
+    function renderSeccion(gridId, data, bordeClase) {
+      const grid = document.getElementById(gridId);
+      if (!Array.isArray(data) || data.length === 0) {
+        grid.innerHTML = `<div class="col-12"><p class="text-muted">No hay entregas en esta sección</p></div>`;
+        return;
+      }
+      grid.innerHTML = data.map((e) => {
+        const path = String(e.archivo || "");
+        const normalized = path.startsWith("/") ? path : `/${path}`;
+        const hrefArchivo = `${API_ORIGIN}${normalized}`;
+        const comentarioClase = bordeClase === "border-success"
+          ? "text-success"
+          : (bordeClase === "border-danger" ? "text-danger" : "text-muted");
+
+        const comentarioLabel = bordeClase === "border-success"
+          ? "<strong>Comentario:</strong> "
+          : (bordeClase === "border-danger" ? "<strong>Comentario:</strong> " : "<em>Descripción:</em> ");
+
+        // título: h5 para pendientes, h6 para aprobadas/rechazadas
+        const titleTag = bordeClase ? "h6" : "h5";
+
+        return `
+          <div class="col-md-4">
+            <div class="card mb-3 ${bordeClase || ""}">
+              <div class="card-body">
+                <${titleTag} class="card-title mb-1">${esc(e.titulo)}</${titleTag}>
+                <p class="text-muted mb-1">${esc(e.estudiante)} · ${esc(e.estudiante_email)}</p>
+                <p class="card-text small text-muted mb-1">
+                  <em>Descripción:</em> ${esc(e.descripcion ?? "—")}
+                </p>
+                <p class="card-text small mb-1">
+                  <a href="${hrefArchivo}" target="_blank" rel="noopener">Ver archivo</a>
+                </p>
+                ${bordeClase ? `
+                  <p class="card-text small ${comentarioClase} mb-2">
+                    ${comentarioLabel}${esc(e.comentario_docente ?? "—")}
+                  </p>
+                ` : ""}
+
+                <div class="d-flex gap-2">
+                  <button
+                    class="btn btn-outline-secondary btn-sm btn-historial"
+                    data-id="${e.id}"
+                    data-titulo="${esc(e.titulo)}">
+                    Historial
+                  </button>
+                  ${!bordeClase ? `
+                    <button class="btn btn-success btn-sm" onclick="resolver(${e.id}, 'aprobado')">Aprobar</button>
+                    <button class="btn btn-danger btn-sm" onclick="resolver(${e.id}, 'rechazado')">Rechazar</button>
+                  ` : ""}
+                </div>
+                <small class="text-muted d-block mt-2">Enviado: ${e.fecha ? new Date(e.fecha).toLocaleString() : "—"}</small>
+              </div>
+            </div>
+          </div>`;
+      }).join("");
+    }
+
+    function aplicarFiltrosDoc() {
+      const selEstado = document.getElementById("f-doc-estado")?.value || "";
+      const desde = document.getElementById("f-doc-desde")?.value || "";
+      const hasta = document.getElementById("f-doc-hasta")?.value || "";
+      const dDesde = desde ? new Date(desde + "T00:00:00") : null;
+      const dHasta = hasta ? new Date(hasta + "T23:59:59") : null;
+
+      // Por sección
+      const pendientesV = CACHE.pendientes.filter(x => pasaFiltro({ ...x, _seccion: "en_revision" }, selEstado, dDesde, dHasta));
+      const aprobadasV  = CACHE.aprobadas.filter(x  => pasaFiltro({ ...x, _seccion: "aprobado"    }, selEstado, dDesde, dHasta));
+      const rechazadasV = CACHE.rechazadas.filter(x => pasaFiltro({ ...x, _seccion: "rechazado"   }, selEstado, dDesde, dHasta));
+
+      renderSeccion("grid", pendientesV, null);
+      renderSeccion("grid-aprobadas", aprobadasV, "border-success");
+      renderSeccion("grid-rechazadas", rechazadasV, "border-danger");
+
+      setResumenDoc();
+    }
+
+    function limpiarFiltrosDoc() {
+      document.getElementById("f-doc-estado").value = "";
+      document.getElementById("f-doc-desde").value = "";
+      document.getElementById("f-doc-hasta").value = "";
+      aplicarFiltrosDoc();
+    }
+
+    /* =================== Carga desde API =================== */
     async function cargarPendientes() {
       const grid = document.getElementById("grid");
       const msg = document.getElementById("msg");
@@ -197,45 +396,8 @@
         const res = await fetch(`${API}/pendientes`, { credentials: "include" });
         if (!res.ok) throw new Error("No fue posible obtener pendientes");
         const data = await res.json();
-        if (!Array.isArray(data) || data.length === 0) {
-          grid.innerHTML = `<div class="col-12"><p class="text-muted">No hay entregas pendientes</p></div>`;
-          msg.textContent = "";
-          return;
-        }
-        grid.innerHTML = data.map((e) => {
-          const path = String(e.archivo || "");
-          const normalized = path.startsWith("/") ? path : `/${path}`;
-          const hrefArchivo = `${API_ORIGIN}${normalized}`;
-          return `
-            <div class="col-md-4">
-              <div class="card mb-3">
-                <div class="card-body">
-                  <h5 class="card-title mb-2">${esc(e.titulo)}</h5>
-                  <p class="text-muted mb-1">${esc(e.estudiante)} · ${esc(e.estudiante_email)}</p>
-                  <p class="card-text small text-muted mb-1">
-                    <em>Descripción:</em> ${esc(e.descripcion ?? "—")}
-                  </p>
-                  <p class="mb-3">
-                    <a href="${hrefArchivo}" target="_blank" rel="noopener">Ver archivo</a>
-                  </p>
-                  <div class="d-flex gap-2">
-                    <!-- ✅ Botón HISTORIAL (pendientes) -->
-                    <button
-                      class="btn btn-outline-secondary btn-sm btn-historial"
-                      data-id="${e.id}"
-                      data-titulo="${esc(e.titulo)}">
-                      Historial
-                    </button>
-                    <button class="btn btn-success btn-sm" onclick="resolver(${e.id}, 'aprobado')">Aprobar</button>
-                    <button class="btn btn-danger btn-sm" onclick="resolver(${e.id}, 'rechazado')">Rechazar</button>
-                  </div>
-                </div>
-                <div class="card-footer bg-transparent border-0 pt-0">
-                  <small class="text-muted">Enviado: ${e.fecha ? new Date(e.fecha).toLocaleString() : "—"}</small>
-                </div>
-              </div>
-            </div>`;
-        }).join("");
+        CACHE.pendientes = Array.isArray(data) ? data.slice() : [];
+        aplicarFiltrosDoc();
         msg.textContent = "";
       } catch (err) {
         grid.innerHTML = `<div class="col-12"><p class="text-danger">Error cargando pendientes</p></div>`;
@@ -250,43 +412,8 @@
         const res = await fetch(`${API}/aprobadas`, { credentials: "include" });
         if (!res.ok) throw new Error("No fue posible obtener aprobadas");
         const data = await res.json();
-        if (!Array.isArray(data) || data.length === 0) {
-          grid.innerHTML = `<div class="col-12"><p class="text-muted">No hay entregas en esta sección</p></div>`;
-          return;
-        }
-        grid.innerHTML = data.map((e) => {
-          const path = String(e.archivo || "");
-          const normalized = path.startsWith("/") ? path : `/${path}`;
-          const hrefArchivo = `${API_ORIGIN}${normalized}`;
-          return `
-            <div class="col-md-4">
-              <div class="card mb-3 border-success">
-                <div class="card-body">
-                  <h6 class="card-title mb-1">${esc(e.titulo)}</h6>
-                  <p class="text-muted mb-1">${esc(e.estudiante)} · ${esc(e.estudiante_email)}</p>
-                  <p class="card-text small text-muted mb-1">
-                    <em>Descripción:</em> ${esc(e.descripcion ?? "—")}
-                  </p>
-                  <p class="card-text small mb-1">
-                    <a href="${hrefArchivo}" target="_blank" rel="noopener">Ver archivo</a>
-                  </p>
-                  <p class="card-text small text-success mb-2">
-                    <strong>Comentario:</strong> ${esc(e.comentario_docente ?? "—")}
-                  </p>
-                  <div class="d-flex gap-2">
-                    <!-- ✅ Botón HISTORIAL (aprobadas) -->
-                    <button
-                      class="btn btn-outline-secondary btn-sm btn-historial"
-                      data-id="${e.id}"
-                      data-titulo="${esc(e.titulo)}">
-                      Historial
-                    </button>
-                  </div>
-                  <small class="text-muted d-block mt-2">Enviado: ${e.fecha ? new Date(e.fecha).toLocaleString() : "—"}</small>
-                </div>
-              </div>
-            </div>`;
-        }).join("");
+        CACHE.aprobadas = Array.isArray(data) ? data.slice() : [];
+        aplicarFiltrosDoc();
       } catch (e) {
         grid.innerHTML = `<div class="col-12"><p class="text-danger">Error cargando aprobadas</p></div>`;
       }
@@ -298,43 +425,8 @@
         const res = await fetch(`${API}/rechazadas`, { credentials: "include" });
         if (!res.ok) throw new Error("No fue posible obtener rechazadas");
         const data = await res.json();
-        if (!Array.isArray(data) || data.length === 0) {
-          grid.innerHTML = `<div class="col-12"><p class="text-muted">No hay entregas en esta sección</p></div>`;
-          return;
-        }
-        grid.innerHTML = data.map((e) => {
-          const path = String(e.archivo || "");
-          const normalized = path.startsWith("/") ? path : `/${path}`;
-          const hrefArchivo = `${API_ORIGIN}${normalized}`;
-          return `
-            <div class="col-md-4">
-              <div class="card mb-3 border-danger">
-                <div class="card-body">
-                  <h6 class="card-title mb-1">${esc(e.titulo)}</h6>
-                  <p class="text-muted mb-1">${esc(e.estudiante)} · ${esc(e.estudiante_email)}</p>
-                  <p class="card-text small text-muted mb-1">
-                    <em>Descripción:</em> ${esc(e.descripcion ?? "—")}
-                  </p>
-                  <p class="card-text small mb-1">
-                    <a href="${hrefArchivo}" target="_blank" rel="noopener">Ver archivo</a>
-                  </p>
-                  <p class="card-text small text-danger mb-2">
-                    <strong>Comentario:</strong> ${esc(e.comentario_docente ?? "—")}
-                  </p>
-                  <div class="d-flex gap-2">
-                    <!-- ✅ Botón HISTORIAL (rechazadas) -->
-                    <button
-                      class="btn btn-outline-secondary btn-sm btn-historial"
-                      data-id="${e.id}"
-                      data-titulo="${esc(e.titulo)}">
-                      Historial
-                    </button>
-                  </div>
-                  <small class="text-muted d-block mt-2">Enviado: ${e.fecha ? new Date(e.fecha).toLocaleString() : "—"}</small>
-                </div>
-              </div>
-            </div>`;
-        }).join("");
+        CACHE.rechazadas = Array.isArray(data) ? data.slice() : [];
+        aplicarFiltrosDoc();
       } catch (e) {
         grid.innerHTML = `<div class="col-12"><p class="text-danger">Error cargando rechazadas</p></div>`;
       }
@@ -363,7 +455,19 @@
     }
     window.resolver = resolver;
 
+    /* =================== Eventos UI filtros =================== */
+    document.getElementById("f-doc-aplicar")?.addEventListener("click", aplicarFiltrosDoc);
+    document.getElementById("f-doc-limpiar")?.addEventListener("click", limpiarFiltrosDoc);
+
+    // Cambios instantáneos (opcional)
+    ["f-doc-estado","f-doc-desde","f-doc-hasta"].forEach(id => {
+      document.getElementById(id)?.addEventListener("change", aplicarFiltrosDoc);
+    });
+
+    // Botón cargar pendientes explícito
     document.getElementById("btn-cargar").addEventListener("click", cargarPendientes);
+
+    // Carga inicial de las tres listas
     cargarPendientes();
     cargarAprobadas();
     cargarRechazadas();

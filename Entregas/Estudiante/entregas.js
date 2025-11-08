@@ -1,24 +1,27 @@
 // Entregas/Estudiante/entregas.js
 import { API_BASE } from "/guard.js";
 
-
+/* =================== Utilidades =================== */
 const claseEstado = (s = "") => {
-  s = s.toLowerCase();
-  if (s === "aprobado")    return "badge rounded-pill bg-success";          // verde
-  if (s === "rechazado")   return "badge rounded-pill bg-danger";           // rojo
-  if (s === "en_revision") return "badge rounded-pill bg-warning text-dark"; // amarillo
+  s = String(s).toLowerCase().trim();
+  if (s === "aprobado")    return "badge rounded-pill bg-success";           // verde
+  if (s === "rechazado")   return "badge rounded-pill bg-danger";            // rojo
+  if (s === "en_revision" || s === "en revisión") return "badge rounded-pill bg-warning text-dark"; // amarillo
   return "badge rounded-pill bg-secondary";
 };
 
+const normalizaEstado = (s = "") =>
+  String(s).toLowerCase().replace(/\s+/g, "_").trim();
 
-// Espero a que el guard valide y me devuelva el usuario
-const SESSION = await window.SESION_PROMISE;
-if (!SESSION) throw new Error("Sesión inválida o sin permisos");
-
-// Alineado con backend en /api/entregas
-const API = `${API_BASE}/api/entregas`;
-const API_ORIGIN = new URL(API).origin; // origen dinámico (http://localhost:8000)
-const ID_ESTUDIANTE = SESSION.id;
+const soloFecha = (d) => {
+  // Retorna "YYYY-MM-DD" desde Date o string
+  const dt = d instanceof Date ? d : new Date(d);
+  if (isNaN(dt)) return "";
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, "0");
+  const day = String(dt.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
 
 // Escapar texto para evitar inyecciones
 const esc = (s) =>
@@ -26,7 +29,110 @@ const esc = (s) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
   );
 
-// =================== Render tabla ===================
+/* =================== Sesión / API =================== */
+const SESSION = await window.SESION_PROMISE;
+if (!SESSION) throw new Error("Sesión inválida o sin permisos");
+
+const API = `${API_BASE}/api/entregas`;
+const API_ORIGIN = new URL(API).origin; // ej: http://localhost:8000
+const ID_ESTUDIANTE = SESSION.id;
+
+/* =================== Estado local (cache) =================== */
+let CACHE_ENTREGAS = [];  // todas las entregas del estudiante (desde API)
+let VISTA_ENTREGAS = [];  // resultado después de aplicar filtros
+
+/* =================== Render base =================== */
+function renderFilas(data) {
+  const tbody = document.getElementById("tbody-entregas");
+  if (!Array.isArray(data) || data.length === 0) {
+    tbody.innerHTML = "<tr><td colspan='7'>Sin resultados</td></tr>";
+    return;
+  }
+
+  tbody.innerHTML = data.map((e) => {
+    const fechaLegible = e.fecha ? new Date(e.fecha).toLocaleString() : "";
+    const estadoTxt = esc(e.estado);
+    return `
+      <tr>
+        <td>${esc(e.titulo)}</td>
+        <td>${esc(e.descripcion)}</td>
+        <td>
+          <a href="${API_ORIGIN}${esc(e.archivo)}" target="_blank" rel="noopener">Ver</a>
+        </td>
+        <td><span class="${claseEstado(e.estado)}">${estadoTxt}</span></td>
+        <td>${esc(e.comentario_docente ?? "—")}</td>
+        <td>${fechaLegible}</td>
+        <td>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-primary btn-ver-historial"
+            data-entrega-id="${e.id}"
+            data-entrega-titulo="${esc(e.titulo)}">
+            Ver historial
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function setResumen(total, filtrados, estadoSel, desde, hasta) {
+  const el = document.getElementById("filtros-resumen");
+  if (!el) return;
+
+  const partes = [];
+  if (estadoSel) {
+    const friendly = estadoSel === "en_revision" ? "en revisión" : estadoSel;
+    partes.push(`estado: ${friendly}`);
+  }
+  if (desde) partes.push(`desde: ${desde}`);
+  if (hasta) partes.push(`hasta: ${hasta}`);
+
+  const filtrosTxt = partes.length ? `(${partes.join(" · ")})` : "(sin filtros)";
+  el.textContent = `Mostrando ${filtrados} de ${total} entregas ${filtrosTxt}.`;
+}
+
+/* =================== Filtrado =================== */
+function aplicaFiltros() {
+  const selEstado = normalizaEstado(document.getElementById("f-estado")?.value || "");
+  const desde = document.getElementById("f-desde")?.value || "";
+  const hasta = document.getElementById("f-hasta")?.value || "";
+
+  const dDesde = desde ? new Date(`${desde}T00:00:00`) : null;
+  const dHasta = hasta ? new Date(`${hasta}T23:59:59`) : null;
+
+  VISTA_ENTREGAS = CACHE_ENTREGAS.filter((e) => {
+    // Estado
+    if (selEstado) {
+      if (normalizaEstado(e.estado) !== selEstado) return false;
+    }
+    // Fechas (inclusivo)
+    if (dDesde || dHasta) {
+      const dItem = e.fecha ? new Date(e.fecha) : null;
+      if (!dItem || isNaN(dItem)) return false;
+      if (dDesde && dItem < dDesde) return false;
+      if (dHasta && dItem > dHasta) return false;
+    }
+    return true;
+  });
+
+  renderFilas(VISTA_ENTREGAS);
+  setResumen(CACHE_ENTREGAS.length, VISTA_ENTREGAS.length, selEstado, desde, hasta);
+}
+
+function limpiarFiltros() {
+  const fEstado = document.getElementById("f-estado");
+  const fDesde  = document.getElementById("f-desde");
+  const fHasta  = document.getElementById("f-hasta");
+  if (fEstado) fEstado.value = "";
+  if (fDesde)  fDesde.value  = "";
+  if (fHasta)  fHasta.value  = "";
+  VISTA_ENTREGAS = [...CACHE_ENTREGAS];
+  renderFilas(VISTA_ENTREGAS);
+  setResumen(CACHE_ENTREGAS.length, VISTA_ENTREGAS.length, "", "", "");
+}
+
+/* =================== Carga inicial =================== */
 async function cargarMisEntregas() {
   const tbody = document.getElementById("tbody-entregas");
   tbody.innerHTML = "<tr><td colspan='7'>Cargando...</td></tr>";
@@ -37,37 +143,18 @@ async function cargarMisEntregas() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
-    if (!Array.isArray(data) || data.length === 0) {
-      tbody.innerHTML = "<tr><td colspan='7'>Sin entregas aún</td></tr>";
-      return;
-    }
+    CACHE_ENTREGAS = Array.isArray(data) ? data.slice() : [];
+    // Orden opcional: más recientes primero
+    CACHE_ENTREGAS.sort((a, b) => {
+      const da = a.fecha ? new Date(a.fecha).getTime() : 0;
+      const db = b.fecha ? new Date(b.fecha).getTime() : 0;
+      return db - da;
+    });
 
-    // Renderizo filas + botón "Ver historial"
-    tbody.innerHTML = data
-      .map(
-        (e) => `
-        <tr>
-          <td>${esc(e.titulo)}</td>
-          <td>${esc(e.descripcion)}</td>
-          <td>
-            <a href="${API_ORIGIN}${esc(e.archivo)}" target="_blank" rel="noopener">Ver</a>
-          </td>
-          <td><span class="${claseEstado(e.estado)}">${esc(e.estado)}</span></td>
-          <td>${esc(e.comentario_docente ?? "—")}</td>
-          <td>${e.fecha ? new Date(e.fecha).toLocaleString() : ""}</td>
-          <td>
-            <button
-              type="button"
-              class="btn btn-sm btn-outline-primary btn-ver-historial"
-              data-entrega-id="${e.id}"
-              data-entrega-titulo="${esc(e.titulo)}">
-              Ver historial
-            </button>
-          </td>
-        </tr>
-      `
-      )
-      .join("");
+    // Inicializamos vista y resumen
+    VISTA_ENTREGAS = [...CACHE_ENTREGAS];
+    renderFilas(VISTA_ENTREGAS);
+    setResumen(CACHE_ENTREGAS.length, VISTA_ENTREGAS.length, "", "", "");
   } catch (err) {
     console.error(err);
     tbody.innerHTML =
@@ -75,7 +162,7 @@ async function cargarMisEntregas() {
   }
 }
 
-// =================== Modal Historial ===================
+/* =================== Modal Historial =================== */
 function setHistorialState(state /* 'loading'|'ok'|'empty'|'error' */) {
   const elLoader = document.getElementById("historial-loader");
   const elCont   = document.getElementById("historial-contenido");
@@ -93,8 +180,6 @@ function renderHistorial(items) {
     .map((it) => {
       const fecha = it.fecha ? new Date(it.fecha).toLocaleString() : "";
       const usuario = it.usuario_nombre || `Usuario #${it.usuario_id ?? "—"}`;
-
-      // Si viene "estado_anterior/estado_nuevo", lo mostramos como De→A; si no, solo comentario
       const detalleEstado =
         it.estado_anterior != null || it.estado_nuevo != null
           ? `
@@ -106,7 +191,6 @@ function renderHistorial(items) {
             </div>
           `
           : "";
-
       const comentario =
         it.comentario
           ? `<div class="mt-1"><strong>Comentario:</strong> ${esc(it.comentario)}</div>`
@@ -132,13 +216,11 @@ function renderHistorial(items) {
 }
 
 async function abrirModalHistorial(entregaId, entregaTitulo) {
-  // Título del modal contextual
   const modalTitle = document.getElementById("modalHistorialLabel");
   if (modalTitle) {
     modalTitle.textContent = `Historial: ${entregaTitulo || `Entrega #${entregaId}`}`;
   }
 
-  // Estado inicial: loading
   setHistorialState("loading");
   document.getElementById("historial-lista").innerHTML = "";
 
@@ -160,13 +242,12 @@ async function abrirModalHistorial(entregaId, entregaTitulo) {
     setHistorialState("error");
   }
 
-  // Abrir modal
   const modalEl = document.getElementById("modalHistorial");
   const bsModal = new window.bootstrap.Modal(modalEl);
   bsModal.show();
 }
 
-// Delegación de click para el botón "Ver historial"
+// Delegación de click para "Ver historial"
 document.addEventListener("click", (ev) => {
   const btn = ev.target.closest(".btn-ver-historial");
   if (!btn) return;
@@ -175,7 +256,7 @@ document.addEventListener("click", (ev) => {
   abrirModalHistorial(entregaId, entregaTitulo);
 });
 
-// =================== Form submit ===================
+/* =================== Envío de nueva entrega =================== */
 document.getElementById("form-entrega").addEventListener("submit", async (e) => {
   e.preventDefault();
   const msg = document.getElementById("msg");
@@ -199,12 +280,32 @@ document.getElementById("form-entrega").addEventListener("submit", async (e) => 
 
     msg.textContent = "¡Enviado!";
     e.target.reset();
-    cargarMisEntregas();
+    await cargarMisEntregas(); // recarga cache
   } catch (err) {
     console.error(err);
     msg.textContent = "Error";
   }
 });
 
-// Inicializo la tabla
+/* =================== Eventos de filtros =================== */
+const btnAplicar = document.getElementById("f-aplicar");
+const btnLimpiar = document.getElementById("f-limpiar");
+
+// Botones
+btnAplicar?.addEventListener("click", aplicaFiltros);
+btnLimpiar?.addEventListener("click", limpiarFiltros);
+
+// Enter en inputs ejecuta "Aplicar"
+document.getElementById("filtros-form")?.addEventListener("submit", (e) => {
+  e.preventDefault();
+  aplicaFiltros();
+});
+
+// Opcional: aplicar al cambiar (UX rápida)
+["f-estado", "f-desde", "f-hasta"].forEach((id) => {
+  const el = document.getElementById(id);
+  el?.addEventListener("change", () => aplicaFiltros());
+});
+
+/* =================== Init =================== */
 cargarMisEntregas();
