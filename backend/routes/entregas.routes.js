@@ -64,26 +64,47 @@ router.post("/", upload.single("archivo"), async (req, res) => {
       detalle: { titulo, archivo: archivoUrl }
     });
 
-    // ── HISTORIAL: registrar creación (se mantiene tal cual lo tenías) ──
-    try {
-      const usuarioId2 = req.session?.user?.id ?? Number(id_estudiante);
-      await pool.query(
-        `INSERT INTO historial_entregas
-           (entrega_id, usuario_id, estado_anterior, estado_nuevo, comentario, fecha, ip, user_agent)
-         VALUES (?,?,?,?,?, NOW(), ?, ?)`,
-        [
-          nuevaId,
-          usuarioId2,
-          null,                    // no hay estado anterior
-          "en_revision",           // estado inicial
-          JSON.stringify({ titulo, archivo: archivoUrl }),
-          req.ip ?? null,
-          req.headers["user-agent"] ?? null,
-        ]
-      );
-    } catch (e) {
-      console.warn("⚠️ No se pudo registrar historial de creación:", e?.message);
-    }
+// ── HISTORIAL: registrar creación ──
+try {
+  const usuarioId2 = req.session?.user?.id ?? Number(id_estudiante);
+
+  // a) creación (estado inicial)
+  await pool.query(
+    `INSERT INTO historial_entregas
+      (entrega_id, usuario_id, usuario_rol, accion, campo, valor_anterior, valor_nuevo, comentario, fecha)
+     VALUES (?,?,?,?,?,?,?,?, NOW())`,
+    [
+      nuevaId,
+      usuarioId2,
+      'estudiante',
+      'CREACION',
+      'estado',
+      null,
+      'en_revision',
+      JSON.stringify({ titulo, archivo: archivoUrl }),
+    ]
+  );
+
+  // b) archivo subido (opcional, deja si quieres ver este movimiento)
+  await pool.query(
+    `INSERT INTO historial_entregas
+      (entrega_id, usuario_id, usuario_rol, accion, campo, valor_anterior, valor_nuevo, comentario, fecha)
+      VALUES (?,?,?,?,?,?,?,?, NOW())`,
+    [
+      nuevaId,
+      usuarioId2,
+      'estudiante',
+      'CAMBIO_ARCHIVO',
+      'archivo',
+      null,
+      archivoUrl,
+      'Archivo subido por el estudiante',
+    ]
+  );
+} catch (e) {
+  console.warn("⚠️ No se pudo registrar historial de creación:", e?.message);
+}
+
     // ─────────────────────────────────────────────────────────────
 
     return res.status(201).json({ ok: true, archivo: archivoUrl });
@@ -180,22 +201,48 @@ router.get("/rechazadas", async (_req, res) => {
 */
 router.get("/:id/historial", async (req, res) => {
   try {
-    const id = Number(req.params.id);
-    if (!id) return res.status(400).json({ error: "ID inválido" });
+    const entregaId = Number(req.params.id);
+    if (!entregaId) return res.status(400).json({ error: "ID inválido" });
 
+    const limit = Math.min(Math.max(parseInt(req.query.limit || "100", 10), 1), 500);
+    const page = Math.max(parseInt(req.query.page || "1", 10), 1);
+    const offset = (page - 1) * limit;
+
+    // Usamos tus columnas: accion, campo, valor_anterior, valor_nuevo, comentario, fecha
+    // y devolvemos alias 'estado_anterior/estado_nuevo' SOLO cuando campo='estado'
     const [rows] = await pool.query(
-      `SELECT id, entrega_id, usuario_id, estado_anterior, estado_nuevo, comentario, fecha, ip, user_agent
-         FROM historial_entregas
-        WHERE entrega_id = ?
-        ORDER BY fecha DESC`,
-      [id]
+      `
+      SELECT
+        h.id,
+        h.entrega_id,
+        h.usuario_id,
+        u.nombre AS usuario_nombre,
+        h.usuario_rol,
+        h.accion,
+        h.campo,
+        h.valor_anterior,
+        h.valor_nuevo,
+        h.comentario,
+        h.fecha,
+        /* Aliases para el front (opcionales) */
+        CASE WHEN h.campo = 'estado' THEN h.valor_anterior ELSE NULL END AS estado_anterior,
+        CASE WHEN h.campo = 'estado' THEN h.valor_nuevo    ELSE NULL END AS estado_nuevo
+      FROM historial_entregas h
+      LEFT JOIN usuarios u ON u.id = h.usuario_id
+      WHERE h.entrega_id = ?
+      ORDER BY h.fecha DESC
+      LIMIT ? OFFSET ?
+      `,
+      [entregaId, limit, offset]
     );
+
     res.json(rows);
   } catch (err) {
     console.error("Error GET /api/entregas/:id/historial:", err);
     res.status(500).json({ error: "No se pudo obtener el historial" });
   }
 });
+
 
 /* ────────────────────── Cambiar estado (Docente) ──────────────────────
    PATCH /api/entregas/:id/estado
@@ -236,25 +283,28 @@ router.patch("/:id/estado", async (req, res) => {
     }
 
     // 6) Registrar en historial
-    try {
-      const usuarioId = req.session?.user?.id ?? null; // docente que realiza el cambio
-      await pool.query(
-        `INSERT INTO historial_entregas
-          (entrega_id, usuario_id, estado_anterior, estado_nuevo, comentario, fecha, ip, user_agent)
-          VALUES (?,?,?,?,?, NOW(), ?, ?)`,
-        [
-          id,
-          usuarioId,
-          actual.estado_actual ?? null,
-          dbEstado,
-          comentario,
-          req.ip ?? null,
-          req.headers["user-agent"] ?? null,
-        ]
-      );
-    } catch (e) {
-      console.warn("⚠️ No se pudo registrar historial de cambio:", e?.message);
-    }
+// 6) Registrar en historial (usa tu esquema)
+try {
+  const usuarioId = req.session?.user?.id ?? null; // docente que realiza el cambio
+  await pool.query(
+    `INSERT INTO historial_entregas
+      (entrega_id, usuario_id, usuario_rol, accion, campo, valor_anterior, valor_nuevo, comentario, fecha)
+      VALUES (?,?,?,?,?,?,?,?, NOW())`,
+    [
+      id,
+      usuarioId,
+      'docente',
+      'CAMBIO_ESTADO',
+      'estado',
+      actual.estado_actual ?? null,
+      dbEstado,
+      comentario,
+    ]
+  );
+} catch (e) {
+  console.warn("⚠️ No se pudo registrar historial de cambio:", e?.message);
+}
+
 
     // 7) Respuesta
     return res.json({
