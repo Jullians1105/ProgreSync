@@ -1,5 +1,8 @@
 // backend/app.js
 
+
+import historialRoutes from "./routes/historial.routes.js"; 
+
 // Express: servidor HTTP y enrutamiento
 import express from "express";
 
@@ -36,6 +39,11 @@ const ALLOWED_ORIGINS = [
   "http://127.0.0.7:5500", // Live Server
   "http://localhost:5173", 
 ];
+
+
+app.locals.pool = pool; // para usar pool en rutas si lo necesitas
+app.use("/api/historial", historialRoutes);
+
 
 app.use(
   cors({

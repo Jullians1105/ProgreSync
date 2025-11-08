@@ -3,6 +3,7 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import { pool } from "../services/db.js";
+import { logCambio } from "../services/historial.js";
 
 const router = Router();
 
@@ -47,11 +48,43 @@ router.post("/", upload.single("archivo"), async (req, res) => {
     const archivoUrl = `/uploads/${req.file.filename}`;
     const estado = "en_revision";
 
-    await pool.query(
+    // Insertar la entrega
+    const [result] = await pool.query(
       `INSERT INTO entregas (id_estudiante, titulo, descripcion, archivo, estado, fecha)
        VALUES (?,?,?,?,?, NOW())`,
       [id_estudiante, titulo, descripcion ?? null, archivoUrl, estado]
     );
+
+    const nuevaId = result.insertId;
+    const usuarioId = req.session?.user?.id ?? Number(id_estudiante);
+    await logCambio({
+      entregaId: nuevaId,
+      usuarioId,
+      accion: "CREAR_ENTREGA",
+      detalle: { titulo, archivo: archivoUrl }
+    });
+
+    // ── HISTORIAL: registrar creación (se mantiene tal cual lo tenías) ──
+    try {
+      const usuarioId2 = req.session?.user?.id ?? Number(id_estudiante);
+      await pool.query(
+        `INSERT INTO historial_entregas
+           (entrega_id, usuario_id, estado_anterior, estado_nuevo, comentario, fecha, ip, user_agent)
+         VALUES (?,?,?,?,?, NOW(), ?, ?)`,
+        [
+          nuevaId,
+          usuarioId2,
+          null,                    // no hay estado anterior
+          "en_revision",           // estado inicial
+          JSON.stringify({ titulo, archivo: archivoUrl }),
+          req.ip ?? null,
+          req.headers["user-agent"] ?? null,
+        ]
+      );
+    } catch (e) {
+      console.warn("⚠️ No se pudo registrar historial de creación:", e?.message);
+    }
+    // ─────────────────────────────────────────────────────────────
 
     return res.status(201).json({ ok: true, archivo: archivoUrl });
   } catch (err) {
@@ -76,9 +109,7 @@ router.get("/mis/:id_estudiante", async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error("Error GET /api/entregas/mis:", err);
-    res
-      .status(500)
-      .json({ error: "No se pudieron obtener las entregas" });
+    res.status(500).json({ error: "No se pudieron obtener las entregas" });
   }
 });
 
@@ -98,9 +129,7 @@ router.get("/pendientes", async (_req, res) => {
     res.json(rows);
   } catch (err) {
     console.error("Error GET /api/entregas/pendientes:", err);
-    res
-      .status(500)
-      .json({ error: "No se pudieron obtener las pendientes" });
+    res.status(500).json({ error: "No se pudieron obtener las pendientes" });
   }
 });
 
@@ -121,9 +150,7 @@ router.get("/aprobadas", async (_req, res) => {
     res.json(rows);
   } catch (err) {
     console.error("Error GET /api/entregas/aprobadas:", err);
-    res
-      .status(500)
-      .json({ error: "No se pudieron obtener las aprobadas" });
+    res.status(500).json({ error: "No se pudieron obtener las aprobadas" });
   }
 });
 
@@ -144,9 +171,29 @@ router.get("/rechazadas", async (_req, res) => {
     res.json(rows);
   } catch (err) {
     console.error("Error GET /api/entregas/rechazadas:", err);
-    res
-      .status(500)
-      .json({ error: "No se pudieron obtener las rechazadas" });
+    res.status(500).json({ error: "No se pudieron obtener las rechazadas" });
+  }
+});
+
+/* ────────────────────── Historial por entrega ──────────────────────
+   GET /api/entregas/:id/historial
+*/
+router.get("/:id/historial", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "ID inválido" });
+
+    const [rows] = await pool.query(
+      `SELECT id, entrega_id, usuario_id, estado_anterior, estado_nuevo, comentario, fecha, ip, user_agent
+         FROM historial_entregas
+        WHERE entrega_id = ?
+        ORDER BY fecha DESC`,
+      [id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Error GET /api/entregas/:id/historial:", err);
+    res.status(500).json({ error: "No se pudo obtener el historial" });
   }
 });
 
@@ -155,48 +202,70 @@ router.get("/rechazadas", async (_req, res) => {
 */
 router.patch("/:id/estado", async (req, res) => {
   try {
+    // 1) ID válido
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "ID inválido" });
 
-    // Mapeo del estado del front → valores en BD
+    // 2) Mapeo del estado del front → valores en BD
     const estadoIn = String(req.body?.estado || "").toLowerCase();
     let dbEstado = "en_revision";
     if (estadoIn.includes("aprob")) dbEstado = "aprobado";
     else if (estadoIn.includes("rechaz")) dbEstado = "rechazado";
 
-    // Comentario opcional
-    const comentario = String(req.body?.comentario || "").trim();
-    if (comentario) {
-      console.log(
-        `[DOCENTE] Comentario en revisión entrega ${id}:`,
-        comentario
-      );
-    }
+    // 3) Comentario opcional
+    const comentario = String(req.body?.comentario || "").trim() || null;
 
-    // Update con comentario_docente
+    // 4) Obtener estado/comentario actuales (para validar y registrar historial)
+    const [[actual]] = await pool.query(
+      `SELECT estado AS estado_actual, comentario_docente AS comentario_actual
+         FROM entregas
+        WHERE id = ? LIMIT 1`,
+      [id]
+    );
+    if (!actual) return res.status(404).json({ error: "Entrega no encontrada" });
+
+    // 5) Actualizar entrega
     const [result] = await pool.query(
       `UPDATE entregas
          SET estado = ?, comentario_docente = ?
        WHERE id = ?`,
-      [dbEstado, comentario || null, id]
+      [dbEstado, comentario, id]
     );
-
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: "Entrega no encontrada" });
     }
 
-    // Respuesta
+    // 6) Registrar en historial
+    try {
+      const usuarioId = req.session?.user?.id ?? null; // docente que realiza el cambio
+      await pool.query(
+        `INSERT INTO historial_entregas
+          (entrega_id, usuario_id, estado_anterior, estado_nuevo, comentario, fecha, ip, user_agent)
+          VALUES (?,?,?,?,?, NOW(), ?, ?)`,
+        [
+          id,
+          usuarioId,
+          actual.estado_actual ?? null,
+          dbEstado,
+          comentario,
+          req.ip ?? null,
+          req.headers["user-agent"] ?? null,
+        ]
+      );
+    } catch (e) {
+      console.warn("⚠️ No se pudo registrar historial de cambio:", e?.message);
+    }
+
+    // 7) Respuesta
     return res.json({
       ok: true,
       id,
       estado: dbEstado,
-      comentario: comentario || null,
+      comentario,
     });
   } catch (err) {
     console.error("Error PATCH /api/entregas/:id/estado:", err);
-    return res
-      .status(500)
-      .json({ error: "No se pudo actualizar el estado" });
+    return res.status(500).json({ error: "No se pudo actualizar el estado" });
   }
 });
 
