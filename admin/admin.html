@@ -16,10 +16,7 @@
     <div class="container-fluid">
       <div class="d-flex align-items-center gap-3">
         <a class="navbar-brand fw-semibold" href="/">ProgreSync</a>
-        <ul class="navbar-nav flex-row gap-3" id="nav-items">
-          <!-- Ejemplos de enlaces comunes -->
-          <!-- Aquí se inyectará “Usuarios” solo si SESSION.rol === 'admin' -->
-        </ul>
+        <ul class="navbar-nav flex-row gap-3" id="nav-items"></ul>
       </div>
       <div class="d-flex align-items-center gap-2">
         <span id="whoami" class="small text-muted"></span>
@@ -27,41 +24,6 @@
       </div>
     </div>
   </nav>
-
-  <!-- Script Opción A: inyectar enlace “Usuarios” si es admin -->
-  <script type="module">
-  import { ensureAdmin } from "/guard.js";
-  const ok = await ensureAdmin();
-  if (!ok) {
-    // el guard ya redirige; detenemos cualquier inicialización
-    throw new Error("No admin");
-  }
-    import { API_BASE } from "/guard.js";
-    const SESSION = await window.SESION_PROMISE;
-    const ul = document.getElementById("nav-items");
-
-    // Mostrar quién soy (opcional)
-    const whoami = document.getElementById("whoami");
-    if (whoami && SESSION?.email && SESSION?.rol) {
-      whoami.textContent = `${SESSION.email} · ${SESSION.rol}`;
-    }
-
-    if (ul) {
-      // Evita duplicado si recargas SPA o navegas internamente
-      const old = ul.querySelector('[data-nav="admin-usuarios"]');
-      if (old) old.remove();
-
-      if (SESSION && SESSION.rol === "admin") {
-        const li = document.createElement("li");
-        li.className = "nav-item";
-        li.setAttribute("data-nav", "admin-usuarios");
-        li.innerHTML = `<a class="nav-link" href="/admin/admin.html">
-                          <i class="bi bi-people"></i> Usuarios
-                        </a>`;
-        ul.appendChild(li);
-      }
-    }
-  </script>
 
   <main class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -100,57 +62,175 @@
         <tbody id="grid"></tbody>
       </table>
     </div>
+
+    <!-- ====== Auditoría (RF-10) ====== -->
+    <section class="my-4" id="sec-auditoria">
+      <div class="card shadow-sm">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <h5 class="mb-0">Auditoría (bitácora)</h5>
+          <small class="text-muted">RF-10</small>
+        </div>
+
+        <div class="card-body">
+          <!-- Filtros -->
+          <form id="audFiltros" class="row g-2 align-items-end mb-3">
+            <div class="col-sm-4">
+              <label class="form-label">Buscar</label>
+              <input name="q" class="form-control" placeholder="usuario, ruta, acción, entidad">
+            </div>
+            <div class="col-sm-2">
+              <label class="form-label">Acción</label>
+              <select name="action" class="form-select">
+                <option value="">Todas</option>
+                <option>CREATE</option><option>UPDATE</option><option>DELETE</option>
+                <option>LOGIN</option><option>LOGOUT</option><option>READ</option>
+              </select>
+            </div>
+            <div class="col-sm-2">
+              <label class="form-label">Entidad</label>
+              <input name="entity" class="form-control" placeholder="usuarios, entregas, auth...">
+            </div>
+            <div class="col-sm-2">
+              <label class="form-label">Desde</label>
+              <input type="date" name="from" class="form-control">
+            </div>
+            <div class="col-sm-2">
+              <label class="form-label">Hasta</label>
+              <input type="date" name="to" class="form-control">
+            </div>
+            <div class="col-auto">
+              <button class="btn btn-dark">Filtrar</button>
+            </div>
+          </form>
+
+          <div id="audMsg" class="small text-muted mb-2">—</div>
+
+          <!-- Tabla -->
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Fecha</th>
+                  <th>Usuario</th>
+                  <th>Acción</th>
+                  <th>Entidad</th>
+                  <th>Método</th>
+                  <th class="w-50">Ruta</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody id="audGrid"></tbody>
+            </table>
+          </div>
+
+          <!-- Paginación -->
+          <div class="d-flex gap-2 justify-content-end">
+            <button class="btn btn-outline-secondary btn-sm" id="audPrev">‹ Anterior</button>
+            <button class="btn btn-outline-secondary btn-sm" id="audNext">Siguiente ›</button>
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- ====== Fin Auditoría ====== -->
   </main>
-
-  <!-- Modal Crear/Editar -->
-  <div class="modal fade" id="modalForm" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-      <form class="modal-content" id="formUsuario">
-        <div class="modal-header">
-          <h5 class="modal-title" id="modalTitulo">Nuevo usuario</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <input type="hidden" id="uid">
-
-          <div class="mb-3">
-            <label class="form-label">Nombre</label>
-            <input id="nombre" class="form-control" required minlength="2" maxlength="120">
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">Email</label>
-            <input id="email" type="email" class="form-control" required maxlength="160">
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">Rol</label>
-            <select id="rol" class="form-select" required>
-              <option value="docente">Docente</option>
-              <option value="estudiante">Estudiante</option>
-              <option value="admin">Admin</option>
-              <option value="empresa">Empresa</option>
-            </select>
-          </div>
-
-          <div class="mb-3" id="grpPass">
-            <label class="form-label">Contraseña (mínimo 8)</label>
-            <input id="password" type="password" class="form-control" minlength="8">
-            <div class="form-text">Solo se solicita al crear.</div>
-          </div>
-        </div>
-
-        <div class="modal-footer">
-          <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">Cancelar</button>
-          <button class="btn btn-primary" id="btnGuardar" type="submit">Guardar</button>
-        </div>
-      </form>
-    </div>
-  </div>
 
   <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <!-- Lógica de la página -->
+
+  <!-- ÚNICO módulo de la página: guard, whoami, menú y Auditoría -->
+  <script type="module">
+    import { ensureAdmin, API_BASE } from "/guard.js";
+
+    // 1) Guard una sola vez
+    const ok = await ensureAdmin();
+    if (!ok) throw new Error("No admin");
+
+    // 2) Sesión una sola vez
+    const SESSION = await window.SESION_PROMISE;
+
+    // 3) Whoami + menú
+    const whoami = document.getElementById("whoami");
+    if (whoami && SESSION?.email && SESSION?.rol) {
+      whoami.textContent = `${SESSION.email} · ${SESSION.rol}`;
+    }
+    const ul = document.getElementById("nav-items");
+    if (ul && SESSION?.rol === "admin") {
+      const old = ul.querySelector('[data-nav="admin-usuarios"]');
+      if (old) old.remove();
+      const li = document.createElement("li");
+      li.className = "nav-item";
+      li.setAttribute("data-nav", "admin-usuarios");
+      li.innerHTML = `<a class="nav-link" href="/admin/admin.html">
+                        <i class="bi bi-people"></i> Usuarios
+                      </a>`;
+      ul.appendChild(li);
+    }
+
+    // 4) Auditoría
+    const API = `${API_BASE}/auditoria`;
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    const badge = (a) => a==="CREATE"?"success":a==="UPDATE"?"warning":a==="DELETE"?"danger":a==="LOGIN"?"primary":a==="LOGOUT"?"secondary":"dark";
+
+    const f = document.getElementById("audFiltros");
+    const msg = document.getElementById("audMsg");
+    const grid = document.getElementById("audGrid");
+    const btnPrev = document.getElementById("audPrev");
+    const btnNext = document.getElementById("audNext");
+
+    let state = { page: 1, limit: 50, q:"", action:"", entity:"", from:"", to:"", sort:"created_at", dir:"DESC", pages: 1 };
+
+    async function fetchAudit(params) {
+      const qs = new URLSearchParams(params);
+      const r = await fetch(`${API}?${qs.toString()}`, { credentials: "include" });
+      if (!r.ok) throw new Error("No se pudo cargar auditoría");
+      return r.json();
+    }
+
+    function row(a) {
+      return `
+        <tr>
+          <td class="text-nowrap">${esc(a.created_at)}</td>
+          <td>${esc(a.user_email ?? a.user_id ?? "—")}</td>
+          <td><span class="badge text-bg-${badge(a.action)}">${esc(a.action)}</span></td>
+          <td>${esc(a.entity)}${a.entity_id ? ` #${esc(a.entity_id)}` : ""}</td>
+          <td>${esc(a.method ?? "—")}</td>
+          <td class="text-truncate" title="${esc(a.path)}">${esc(a.path ?? "—")}</td>
+          <td>${a.status_code ?? "—"}</td>
+        </tr>
+      `;
+    }
+
+    async function render() {
+      msg.textContent = "Cargando…";
+      try {
+        const res = await fetchAudit(state);
+        grid.innerHTML = res.data.map(row).join("") || `<tr><td colspan="7" class="text-center">Sin registros</td></tr>`;
+        state.pages = res.pages ?? 1;
+        msg.textContent = `Mostrando ${res.data.length} de ${res.total} registros (pág. ${res.page}/${res.pages})`;
+        btnPrev.disabled = state.page <= 1;
+        btnNext.disabled = state.page >= state.pages;
+      } catch (e) {
+        console.error(e);
+        msg.textContent = "Error cargando la bitácora";
+        grid.innerHTML = `<tr><td colspan="7" class="text-center text-danger">Error al cargar</td></tr>`;
+      }
+    }
+
+    f.addEventListener("submit", (ev) => {
+      ev.preventDefault();
+      const data = Object.fromEntries(new FormData(f).entries());
+      state = { ...state, page: 1, ...data };
+      render();
+    });
+
+    btnPrev.addEventListener("click", () => { if (state.page > 1) { state.page--; render(); } });
+    btnNext.addEventListener("click", () => { if (state.page < state.pages) { state.page++; render(); } });
+
+    // Primera carga
+    render();
+  </script>
+
+  <!-- Lógica propia de gestión de usuarios (sin guard/sesión adentro para evitar duplicados) -->
   <script type="module" src="/admin/admin.js"></script>
 </body>
 </html>

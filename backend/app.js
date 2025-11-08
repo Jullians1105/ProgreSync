@@ -1,29 +1,17 @@
 // backend/app.js
 
-
-import historialRoutes from "./routes/historial.routes.js"; 
-
-// Express: servidor HTTP y enrutamiento
 import express from "express";
-
-// CORS: define qué frontend puede llamar a este backend
 import cors from "cors";
-
-// Sesiones: crea cookies de sesión en el navegador
 import session from "express-session";
-
-// Bcrypt: manejo de contraseñas con hash
 import bcrypt from "bcryptjs";
-
-// Rutas del módulo de entregas
-import entregasRoutes from "./routes/entregas.routes.js";
-
-// Conexión a MySQL
-import { pool } from "./services/db.js";
-
-// Static uploads (para servir archivos subidos)
 import path from "path";
 import { fileURLToPath } from "url";
+
+import { pool } from "./services/db.js";
+import entregasRoutes from "./routes/entregas.routes.js";
+import historialRoutes from "./routes/historial.routes.js";
+import auditoriaRoutes from "./routes/auditoria.routes.js";
+import { auditMutatingRequests } from "./middlewares/audit.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,23 +20,18 @@ const app = express();
 
 /* =========================
    Configuración de CORS
-   ========================= */
+========================= */
 const ALLOWED_ORIGINS = [
   "http://localhost:5500",
   "http://127.0.0.1:5500",
-  "http://127.0.0.7:5500", // Live Server
-  "http://localhost:5173", 
+  "http://127.0.0.7:5500",
+  "http://localhost:5173",
 ];
-
-
-app.locals.pool = pool; // para usar pool en rutas si lo necesitas
-app.use("/api/historial", historialRoutes);
-
 
 app.use(
   cors({
     origin: (origin, cb) => {
-      if (!origin) return cb(null, true); 
+      if (!origin) return cb(null, true); // requests del mismo origen (extensiones, curl, etc.)
       if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
       return cb(new Error("Not allowed by CORS: " + origin));
     },
@@ -62,7 +45,7 @@ app.use(express.urlencoded({ extended: true }));
 
 /* =========================
    Sesiones
-   ========================= */
+========================= */
 app.set("trust proxy", 1);
 app.use(
   session({
@@ -73,30 +56,32 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: false, // true solo si usas HTTPS
-      maxAge: 1000 * 60 * 60, // 1 hora
+      secure: false,           // true si usas HTTPS
+      maxAge: 1000 * 60 * 60,  // 1 hora
     },
   })
 );
 
 /* =========================
-   Middleware para roles
-   ========================= */
-function requireRole(...rolesPermitidos) {
-  return (req, res, next) => {
-    const user = req.session?.user;
-    if (!user) return res.status(401).json({ error: "No autenticado" });
-    const rol = user.rol || user.role; // tolerante
-    if (!rolesPermitidos.includes(rol)) {
-      return res.status(403).json({ error: "Sin permisos" });
-    }
-    next();
-  };
-}
+   Helpers de request
+========================= */
+// Expone pool por si alguna ruta lo necesita
+app.locals.pool = pool;
+
+// Pasa la sesión a req.user para que la auditoría conozca al usuario
+app.use((req, _res, next) => {
+  if (req.session?.user) req.user = req.session.user;
+  next();
+});
 
 /* =========================
-   Rutas de salud y prueba
-   ========================= */
+   Auditoría (mutaciones)
+========================= */
+app.use(auditMutatingRequests);
+
+/* =========================
+   Rutas base / salud
+========================= */
 app.get("/", (_req, res) => {
   res.send("Servidor backend funcionando");
 });
@@ -117,7 +102,7 @@ app.get("/db-test", async (_req, res) => {
 
 /* =========================
    Autenticación
-   ========================= */
+========================= */
 
 // Login
 app.post("/login", async (req, res) => {
@@ -139,13 +124,12 @@ app.post("/login", async (req, res) => {
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) return res.status(401).json({ error: "Credenciales inválidas" });
 
-    // Guarda ambas claves para compatibilidad (rol y role)
     req.session.user = {
       id: user.id,
       nombre: user.nombre,
       email: user.email,
       rol: user.rol,
-      role: user.rol,
+      role: user.rol, // compat
     };
 
     return res.json({ ok: true, user: req.session.user });
@@ -158,8 +142,8 @@ app.post("/login", async (req, res) => {
 // Usuario actual
 app.get("/me", (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: "No autenticado" });
-  const u = req.session.user; // { id, email, role: 'docente' | 'estudiante' | ... }
-  return res.json({ user: { ...u, rol: u.role } }); // exponemos ambas llaves: role y rol
+  const u = req.session.user;
+  return res.json({ user: { ...u, rol: u.role } });
 });
 
 // Logout
@@ -171,8 +155,23 @@ app.post("/logout", (req, res) => {
 });
 
 /* =========================
+   Roles helper
+========================= */
+function requireRole(...rolesPermitidos) {
+  return (req, res, next) => {
+    const user = req.session?.user;
+    if (!user) return res.status(401).json({ error: "No autenticado" });
+    const rol = user.rol || user.role;
+    if (!rolesPermitidos.includes(rol)) {
+      return res.status(403).json({ error: "Sin permisos" });
+    }
+    next();
+  };
+}
+
+/* =========================
    Gestión de usuarios
-   ========================= */
+========================= */
 
 // Crear usuario (solo admin)
 app.post("/usuarios", requireRole("admin"), async (req, res) => {
@@ -210,12 +209,11 @@ app.post("/usuarios", requireRole("admin"), async (req, res) => {
 // Listar usuarios (solo admin)
 app.get("/usuarios", requireRole("admin"), async (_req, res) => {
   try {
-const [rows] = await pool.query(`
-  SELECT id, nombre, email, rol, estado
-  FROM usuarios
-  ORDER BY id ASC
-`);
-
+    const [rows] = await pool.query(`
+      SELECT id, nombre, email, rol, estado
+      FROM usuarios
+      ORDER BY id ASC
+    `);
     return res.json({ ok: true, usuarios: rows });
   } catch (err) {
     console.error("Error listando usuarios:", err);
@@ -224,19 +222,20 @@ const [rows] = await pool.query(`
 });
 
 /* =========================
-   Archivos subidos estáticos
-   ========================= */
+   Archivos estáticos (uploads)
+========================= */
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 /* =========================
-   Rutas de entregas
-   ========================= */
-// Montamos en /api/entregas para que el front use `${API_BASE}/api/entregas`
+   Rutas de módulos
+========================= */
 app.use("/api/entregas", entregasRoutes);
+app.use("/api/historial", historialRoutes);
+app.use("/auditoria", auditoriaRoutes);
 
 /* =========================
    Debug de rutas registradas
-   ========================= */
+========================= */
 app.get("/debug/routes", (_req, res) => {
   const routes = [];
   const stack = app._router?.stack || [];
@@ -271,8 +270,8 @@ app.get("/debug/routes", (_req, res) => {
 
 /* =========================
    Servidor
-   ========================= */
+========================= */
 const PORT = 8000;
 app.listen(PORT, () => {
-  console.log(`Servidor escuchando en http://${"localhost"}:${PORT}`);
+  console.log(`Servidor escuchando en http://localhost:${PORT}`);
 });
