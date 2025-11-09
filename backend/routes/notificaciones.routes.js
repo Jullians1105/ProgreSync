@@ -5,6 +5,14 @@ const router = Router();
 
 console.log("✅ notificaciones.routes.js cargado");
 
+// Middleware de autenticación
+const requireAuth = (req, res, next) => {
+  if (!req.session?.user?.id) {
+    return res.status(401).json({ error: "No autenticado. Por favor, inicia sesión nuevamente." });
+  }
+  next();
+};
+
 // Helper para obtener id de usuario: preferir sesión, si no usar parámetro
 function getUserId(req) {
   const sid = req.session?.user?.id;
@@ -17,10 +25,9 @@ function getUserId(req) {
    GET /api/notificaciones/mis
    (si quieres, también puedes usar /mis/:id_usuario para debug)
 */
-router.get("/mis", async (req, res) => {
+router.get("/mis", requireAuth, async (req, res) => {
   try {
-    const id_usuario = req.session?.user?.id;
-    if (!id_usuario) return res.status(401).json({ error: "No autenticado" });
+    const id_usuario = req.session.user.id; // Ya sabemos que existe por el middleware
 
     const [rows] = await pool.query(
       `SELECT id, tipo, mensaje, datos, leido, fecha

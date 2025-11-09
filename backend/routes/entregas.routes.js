@@ -107,6 +107,46 @@ try {
 
     // ─────────────────────────────────────────────────────────────
 
+    // NOTIFICAR a docentes: hay una nueva entrega en revisión
+    try {
+      // Obtener nombre del estudiante para el mensaje
+      const [[stu]] = await pool.query(`SELECT nombre FROM usuarios WHERE id = ? LIMIT 1`, [id_estudiante]);
+      const estudianteNombre = stu?.nombre ?? 'Estudiante';
+
+      // Obtener docentes activos
+      const [docentes] = await pool.query(`SELECT id FROM usuarios WHERE rol = 'docente'`);
+      
+      if (docentes.length === 0) {
+        console.warn('⚠️ No hay docentes registrados para notificar');
+      }
+
+      const datos = JSON.stringify({ 
+        entrega_id: nuevaId, 
+        id_estudiante, 
+        tipo: 'nueva_entrega',
+        titulo,
+        estudiante: estudianteNombre
+      });
+      
+      const mensajeBase = `Nueva entrega pendiente de revisión: "${titulo}" del estudiante ${estudianteNombre}`;
+
+      for (const d of docentes) {
+        try {
+          console.log(`📨 Creando notificación para docente ${d.id}`);
+          await pool.query(
+            `INSERT INTO notificaciones (id_usuario, tipo, mensaje, datos, leido, fecha)
+             VALUES (?,?,?,?,0,NOW())`,
+            [d.id, 'nueva_entrega', mensajeBase, datos]
+          );
+        } catch (e) {
+          console.error('⚠️ Error al notificar al docente', d.id, ':', e?.message);
+        }
+      }
+    } catch (e) {
+      console.error('⚠️ Error al crear notificaciones para docentes:', e?.message);
+      console.error(e);
+    }
+
     return res.status(201).json({ ok: true, archivo: archivoUrl });
   } catch (err) {
     console.error("Error POST /api/entregas:", err);
@@ -249,6 +289,18 @@ router.get("/:id/historial", async (req, res) => {
 */
 router.patch("/:id/estado", async (req, res) => {
   try {
+      // 0) Verificar sesión del usuario (desde sesión o headers)
+      const usuarioId = req.session?.user?.id || req.body?.usuario_id || req.headers['x-user-id'];
+      const usuarioRol = req.session?.user?.rol || req.headers['x-user-role'];
+    
+      if (!usuarioId) {
+      return res.status(401).json({ error: "No autenticado. Por favor, inicia sesión nuevamente." });
+    }
+    
+      if (usuarioRol !== 'docente' && usuarioRol !== 'admin') {
+        return res.status(403).json({ error: "Solo los docentes pueden calificar entregas." });
+      }
+
     // 1) ID válido
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "ID inválido" });
@@ -306,7 +358,6 @@ router.patch("/:id/estado", async (req, res) => {
     // 6) Registrar en historial
 // 6) Registrar en historial (usa tu esquema)
 try {
-  const usuarioId = req.session?.user?.id ?? null; // docente que realiza el cambio
   await pool.query(
     `INSERT INTO historial_entregas
       (entrega_id, usuario_id, usuario_rol, accion, campo, valor_anterior, valor_nuevo, comentario, fecha)
@@ -314,7 +365,7 @@ try {
     [
       id,
       usuarioId,
-      'docente',
+          usuarioRol,
       'CAMBIO_ESTADO',
       'estado',
       actual.estado_actual ?? null,

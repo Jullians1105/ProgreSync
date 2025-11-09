@@ -13,6 +13,7 @@ import entregasRoutes from "./routes/entregas.routes.js";
 import notificacionesRoutes from "./routes/notificaciones.routes.js";
 import historialRoutes from "./routes/historial.routes.js";
 import auditoriaRoutes from "./routes/auditoria.routes.js";
+import empresaRoutes from "./routes/empresa.routes.js";
 import { auditMutatingRequests } from "./middlewares/audit.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -239,6 +240,11 @@ app.use("/auditoria", auditoriaRoutes);
   Rutas de notificaciones
   ========================= */
 app.use("/api/notificaciones", notificacionesRoutes);
+
+/* =========================
+  Rutas de empresa
+  ========================= */
+app.use("/api/empresa", empresaRoutes);
 
 /* =========================
    Debug de rutas registradas

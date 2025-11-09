@@ -1,6 +1,6 @@
 // backend/routes/usuarios.routes.js
 import { Router } from "express";
-import { pool } from "../bd.js";
+import { pool } from "../services/db.js";
 import bcrypt from "bcryptjs";
 
 const router = Router();

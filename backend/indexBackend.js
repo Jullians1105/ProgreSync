@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import session from "express-session";
 import usuariosRouter from "./routes/usuarios.routes.js"; // ⬅️ nuevo
-import { pool } from "./bd.js"; // ya lo usas para ping-db
+import { pool } from "./services/db.js"; // ya lo usas para ping-db
 
 const app = express();
 
