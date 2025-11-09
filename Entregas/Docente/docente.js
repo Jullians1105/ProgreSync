@@ -348,13 +348,30 @@ gridPend?.addEventListener("click", async (ev) => {
   btnGuardar.textContent = "Guardando…";
 
   try {
-    const r = await fetch(`${API}/${id}/estado`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ estado, comentario }),
-    });
-    if (!r.ok) throw new Error("HTTP " + r.status);
+      // Primero verificamos que tengamos sesión
+      if (!SESSION?.id) {
+        throw new Error("No hay sesión activa. Por favor, inicia sesión nuevamente.");
+      }
+
+      const r = await fetch(`${API}/${id}/estado`, {
+        method: "PATCH",
+        headers: { 
+          "Content-Type": "application/json",
+          "X-User-Id": SESSION.id.toString(),
+          "X-User-Role": SESSION.role || SESSION.rol || "docente"
+        },
+        credentials: "include",
+        body: JSON.stringify({ 
+          estado, 
+          comentario,
+          usuario_id: SESSION.id  // Incluimos el ID del usuario en el cuerpo
+        }),
+      });
+    
+      if (!r.ok) {
+        const errorData = await r.json().catch(() => ({}));
+        throw new Error(errorData.error || `Error ${r.status}: ${r.statusText}`);
+      }
 
     btnGuardar.textContent = "Guardado ✅";
     // tras guardar, recargamos tres listas (puede moverse de pendientes a otra sección)

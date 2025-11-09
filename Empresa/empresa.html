@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Empresa - ProgreSync</title>
+    <link rel="stylesheet" href="empresa.css">
+</head>
+<body>
+    <header>
+        <h1>Panel de Empresa</h1>
+        <div id="userInfo">
+            <!-- Información del usuario logueado -->
+        </div>
+    </header>
+
+    <main>
+        <section id="estudiantes">
+            <h2>Mis Practicantes</h2>
+            <div id="listaEstudiantes">
+                <!-- Lista de estudiantes -->
+            </div>
+        </section>
+
+        <section id="entregas" class="hidden">
+            <h2>Informes del Estudiante: <span id="nombreEstudiante"></span></h2>
+            <button id="volverBtn" class="btn secondary">← Volver a lista</button>
+            
+            <div id="listaEntregas">
+                <!-- Lista de entregas -->
+            </div>
+        </section>
+    </main>
+
+    <script src="empresa.js"></script>
+</body>
+</html>

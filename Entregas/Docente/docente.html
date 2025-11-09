@@ -437,11 +437,21 @@
       const msg = document.getElementById("msg");
       msg.textContent = "Enviando revisión…";
       try {
+        // Intenta obtener sesión expuesta por el guard
+        const SESSION = window.SESION || (window.SESION_PROMISE ? await window.SESION_PROMISE : null);
+        console.log('resolver - SESSION:', SESSION);
+
+        const headers = { "Content-Type": "application/json" };
+        if (SESSION?.id) {
+          headers['X-User-Id'] = String(SESSION.id);
+          headers['X-User-Role'] = SESSION.rol || SESSION.role || '';
+        }
+
         const res = await fetch(`${API}/${id}/estado`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers,
           credentials: "include",
-          body: JSON.stringify({ estado: mapEstado(estado), comentario }),
+          body: JSON.stringify({ estado: mapEstado(estado), comentario, usuario_id: SESSION?.id || null }),
         });
         if (!res.ok) throw new Error("No se pudo registrar la revisión");
         msg.textContent = "Revisión registrada";
