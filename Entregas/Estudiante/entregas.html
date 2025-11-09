@@ -7,14 +7,15 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="./entregas.css" />
 </head>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <body class="bg-light text-dark">
   <nav class="navbar navbar-light bg-white shadow-sm px-3 border-bottom">
     <div class="d-flex align-items-center">
       <a href="/index.html" class="d-flex align-items-center text-decoration-none">
         <img src="../../Imagenes/Logo_ProgeSync.png" alt="Logo ProgeSync"
-             style="height:40px;width:auto;margin-right:10px;" />
+            style="height:40px;width:auto;margin-right:10px;" />
         <span style="font-size:1.5rem;font-weight:bold;">
-          <span style="color:black;">Proge</span><span style="color:orange;">Sync</span>
+          <span style="color:black;">Progre</span><span style="color:orange;">Sync</span>
         </span>
       </a>
     </div>
@@ -23,12 +24,59 @@
   <main class="container py-4">
     <h1 class="h3 mb-4">Mis Entregas — Estudiante</h1>
 
-    <!-- Añadí name a los inputs para que el backend reciba titulo, descripcion y archivo -->
+    <!-- 🔍 Barra de filtros (solo UI, sin JS aún) -->
+    <section class="card shadow-sm border-0 mb-4">
+      <div class="card-body">
+        <form id="filtros-form" class="row g-3 align-items-end">
+          <!-- Estado -->
+          <div class="col-12 col-md-4">
+            <label for="f-estado" class="form-label mb-1">Estado</label>
+            <select id="f-estado" class="form-select">
+              <option value="">Todos</option>
+              <option value="aprobado">Aprobado</option>
+              <option value="rechazado">Rechazado</option>
+              <option value="en_revision">En revisión</option>
+            </select>
+            <div class="form-text">Filtra por el estado actual de tu entrega.</div>
+          </div>
+
+          <!-- Fecha desde -->
+          <div class="col-12 col-sm-6 col-md-3">
+            <label for="f-desde" class="form-label mb-1">Desde</label>
+            <input id="f-desde" type="date" class="form-control" />
+          </div>
+
+          <!-- Fecha hasta -->
+          <div class="col-12 col-sm-6 col-md-3">
+            <label for="f-hasta" class="form-label mb-1">Hasta</label>
+            <input id="f-hasta" type="date" class="form-control" />
+          </div>
+
+          <!-- Botones -->
+          <div class="col-12 col-md-2 d-grid d-md-flex gap-2">
+            <button id="f-aplicar" type="button" class="btn btn-dark w-100">Aplicar</button>
+            <button id="f-limpiar" type="button" class="btn btn-outline-secondary w-100">Limpiar</button>
+          </div>
+        </form>
+
+        <!-- Resumen / contador de resultados -->
+        <div class="mt-3 d-flex flex-wrap align-items-center gap-2">
+          <small id="filtros-resumen" class="text-muted">
+            Mostrando todas las entregas.
+          </small>
+          <span class="badge text-bg-success">Aprobado</span>
+          <span class="badge text-bg-danger">Rechazado</span>
+          <span class="badge text-bg-warning text-dark">En revisión</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Formulario de nueva entrega -->
     <form id="form-entrega" class="my-3">
       <input id="titulo" name="titulo" class="form-control mb-2" placeholder="Título" required />
       <textarea id="descripcion" name="descripcion" class="form-control mb-2" placeholder="Descripción"></textarea>
       <input id="archivo" name="archivo" type="file" class="form-control mb-2"
-             accept=".pdf,.doc,.docx" required />
+            accept=".pdf,.doc,.docx" required />
       <button type="submit" class="btn btn-primary">Enviar</button>
       <span id="msg" class="ms-2"></span>
     </form>
@@ -36,26 +84,84 @@
     <table class="table table-striped">
       <thead class="table-dark">
         <tr>
-          <!-- Alineo el orden de columnas con el tbody que pinto desde entregas.js -->
           <th>Título</th>
           <th>Descripción</th>
           <th>Archivo</th>
           <th>Estado</th>
-          <th>Comentario</th> <!-- Añadí esta columna para mostrar el comentario del docente -->
+          <th>Comentario</th>
           <th>Fecha</th>
+          <th>Acciones</th>
         </tr>
       </thead>
       <tbody id="tbody-entregas"></tbody>
     </table>
+
+    <!-- Plantilla de fila con botón "Ver historial" -->
+    <template id="tpl-fila-entrega">
+      <tr>
+        <td><span class="e-titulo"></span></td>
+        <td><span class="e-descripcion"></span></td>
+        <td><a class="e-archivo" href="#" target="_blank" rel="noreferrer">Ver</a></td>
+        <td><span class="e-estado"></span></td>
+        <td><span class="e-comentario"></span></td>
+        <td><span class="e-fecha"></span></td>
+        <td>
+          <button type="button"
+                  class="btn btn-sm btn-outline-primary btn-ver-historial"
+                  data-entrega-id="">
+            Ver historial
+          </button>
+        </td>
+      </tr>
+    </template>
+
+    <!-- Modal: Historial de entrega -->
+    <div class="modal fade" id="modalHistorial" tabindex="-1" aria-labelledby="modalHistorialLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="modalHistorialLabel">Historial de la entrega</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body p-0">
+            <!-- Loader -->
+            <div id="historial-loader" class="p-4">
+              <div class="d-flex align-items-center">
+                <div class="spinner-border me-2" role="status" aria-hidden="true"></div>
+                <strong>Cargando historial…</strong>
+              </div>
+            </div>
+
+            <!-- Contenido -->
+            <div id="historial-contenido" class="d-none">
+              <ul id="historial-lista" class="list-group list-group-flush"></ul>
+            </div>
+
+            <!-- Vacío -->
+            <div id="historial-vacio" class="p-4 d-none text-muted">
+              Sin movimientos en el historial.
+            </div>
+
+            <!-- Error -->
+            <div id="historial-error" class="p-4 d-none text-danger">
+              Error al cargar el historial.
+            </div>
+          </div>
+          <div class="modal-footer">
+            <small class="text-muted">El historial es de solo lectura.</small>
+          </div>
+        </div>
+      </div>
+    </div>
   </main>
 
- <!-- Aquí verifico que solo los usuarios con rol "estudiante" puedan entrar a esta página, si el rol no corresponde, guard.js los redirige automáticamente al inicio (index.html). -->
+  <!-- Guard de rol -->
   <script type="module">
     import { requireRole } from "/guard.js";
-    window.SESION_PROMISE = requireRole(["estudiante"]);//Si el usuario no cumple automáticamente se envía al inicio
+    window.SESION_PROMISE = requireRole(["estudiante"]);
   </script>
 
-  <!-- Aquí enlazo el archivo entregas.js, donde programé toda la lógica para que el estudiante pueda ver y gestionar sus entregas. -->
+  <!-- Lógica principal -->
   <script type="module" src="./entregas.js"></script>
 </body>
 </html>

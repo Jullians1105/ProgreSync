@@ -303,7 +303,6 @@ router.patch("/:id/estado", async (req, res) => {
       console.error("Error creando notificación:", errNotify);
       // No fallamos la petición principal por esto; sólo logueamos
     }
-
     // 6) Registrar en historial
 // 6) Registrar en historial (usa tu esquema)
 try {
