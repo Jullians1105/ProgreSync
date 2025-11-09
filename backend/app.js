@@ -14,6 +14,7 @@ import bcrypt from "bcryptjs";
 
 // Rutas del módulo de entregas
 import entregasRoutes from "./routes/entregas.routes.js";
+import notificacionesRoutes from "./routes/notificaciones.routes.js";
 
 // Conexión a MySQL
 import { pool } from "./services/db.js";
@@ -222,6 +223,11 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
    ========================= */
 // Montamos en /api/entregas para que el front use `${API_BASE}/api/entregas`
 app.use("/api/entregas", entregasRoutes);
+
+/* =========================
+  Rutas de notificaciones
+  ========================= */
+app.use("/api/notificaciones", notificacionesRoutes);
 
 /* =========================
    Debug de rutas registradas

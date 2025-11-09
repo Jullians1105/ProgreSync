@@ -185,6 +185,28 @@ router.patch("/:id/estado", async (req, res) => {
       return res.status(404).json({ error: "Entrega no encontrada" });
     }
 
+    // Crear una notificación para el estudiante propietario de la entrega
+    try {
+      const [entRows] = await pool.query(
+        `SELECT id_estudiante, titulo FROM entregas WHERE id = ? LIMIT 1`,
+        [id]
+      );
+      const entrega = entRows[0];
+      if (entrega) {
+        const mensaje = `Tu entrega "${entrega.titulo}" cambió a ${dbEstado}.` +
+          (comentario ? ` Comentario: ${comentario}` : "");
+        const datos = JSON.stringify({ entrega_id: id, nuevo_estado: dbEstado });
+        await pool.query(
+          `INSERT INTO notificaciones (id_usuario, tipo, mensaje, datos, leido, fecha)
+           VALUES (?,?,?,?,0,NOW())`,
+          [entrega.id_estudiante, "estado_entrega", mensaje, datos]
+        );
+      }
+    } catch (errNotify) {
+      console.error("Error creando notificación:", errNotify);
+      // No fallamos la petición principal por esto; sólo logueamos
+    }
+
     // Respuesta
     return res.json({
       ok: true,

@@ -35,3 +35,15 @@ CREATE TABLE IF NOT EXISTS revisiones (
   FOREIGN KEY (id_entrega) REFERENCES entregas(id),
   FOREIGN KEY (id_docente) REFERENCES usuarios(id)
 );
+
+-- Tabla de notificaciones
+CREATE TABLE IF NOT EXISTS notificaciones (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  id_usuario INT NOT NULL,
+  tipo VARCHAR(50) NOT NULL,
+  mensaje TEXT NOT NULL,
+  datos TEXT DEFAULT NULL,
+  leido TINYINT(1) DEFAULT 0,
+  fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (id_usuario) REFERENCES usuarios(id)
+);
