@@ -17,10 +17,25 @@ export async function logCambio({ entregaId, usuarioId = null, accion, detalle =
   const jsonSeguro = JSON.stringify(detalle, (_k, v) => v, 2);
   const jsonCorto = jsonSeguro.length > 65535 ? jsonSeguro.slice(0, 65535) : jsonSeguro;
 
+  // Comprobación preventiva: si la columna detalle_json existe, usamos el INSERT moderno;
+  // si no, evitamos lanzar un error y usamos el INSERT para el esquema antiguo.
+  const hasDetalle = await hasDetalleJson();
+  if (hasDetalle) {
+    await pool.query(
+      `INSERT INTO historial_entregas (entrega_id, usuario_id, accion, detalle_json, fecha)
+       VALUES (?, ?, ?, ?, NOW())`,
+      [entregaId, usuarioId, String(accion).toUpperCase(), jsonCorto]
+    );
+    return;
+  }
+
+  // Fallback a esquema antiguo
+  const comentario = jsonCorto;
   await pool.query(
-    `INSERT INTO historial_entregas (entrega_id, usuario_id, accion, detalle_json, fecha)
-     VALUES (?, ?, ?, ?, NOW())`,
-    [entregaId, usuarioId, String(accion).toUpperCase(), jsonCorto]
+    `INSERT INTO historial_entregas
+      (entrega_id, usuario_id, usuario_rol, accion, campo, valor_anterior, valor_nuevo, comentario, fecha)
+     VALUES (?,?,?,?,?,?,?,?, NOW())`,
+    [entregaId, usuarioId, null, String(accion).toUpperCase(), null, null, null, comentario]
   );
 }
 
@@ -30,23 +45,62 @@ export async function logCambio({ entregaId, usuarioId = null, accion, detalle =
  * @returns {Promise<Array>}
  */
 export async function listarHistorial(entregaId) {
+  const hasDetalle = await hasDetalleJson();
+  if (hasDetalle) {
+    const [rows] = await pool.query(
+      `SELECT id, entrega_id, usuario_id, accion, detalle_json, fecha
+         FROM historial_entregas
+        WHERE entrega_id = ?
+        ORDER BY fecha DESC, id DESC`,
+      [entregaId]
+    );
+    return rows.map(r => ({
+      id: r.id,
+      entrega_id: r.entrega_id,
+      usuario_id: r.usuario_id,
+      accion: r.accion,
+      detalle: safeParseJSON(r.detalle_json),
+      fecha: r.fecha,
+    }));
+  }
+
+  // esquema antiguo
   const [rows] = await pool.query(
-    `SELECT id, entrega_id, usuario_id, accion, detalle_json, fecha
+    `SELECT id, entrega_id, usuario_id, usuario_rol, accion, campo, valor_anterior, valor_nuevo, comentario, fecha
        FROM historial_entregas
       WHERE entrega_id = ?
       ORDER BY fecha DESC, id DESC`,
     [entregaId]
   );
-
-  // Parsear JSON en memoria para que el front no tenga que hacerlo
   return rows.map(r => ({
     id: r.id,
     entrega_id: r.entrega_id,
     usuario_id: r.usuario_id,
     accion: r.accion,
-    detalle: safeParseJSON(r.detalle_json),
+    detalle: {
+      usuario_rol: r.usuario_rol,
+      campo: r.campo,
+      valor_anterior: r.valor_anterior,
+      valor_nuevo: r.valor_nuevo,
+      comentario: safeParseJSON(r.comentario) || r.comentario
+    },
     fecha: r.fecha,
   }));
+}
+
+// Cache para evitar preguntar columnas en cada llamada
+let _hasDetalleJsonCache = null;
+async function hasDetalleJson() {
+  if (typeof _hasDetalleJsonCache === 'boolean') return _hasDetalleJsonCache;
+  try {
+    const [rows] = await pool.query(`SHOW COLUMNS FROM historial_entregas LIKE 'detalle_json'`);
+    _hasDetalleJsonCache = Array.isArray(rows) && rows.length > 0;
+    return _hasDetalleJsonCache;
+  } catch (err) {
+    // Si falla la consulta por cualquier razón, asumimos esquema antiguo para evitar romper
+    _hasDetalleJsonCache = false;
+    return false;
+  }
 }
 
 /** Helper para parsear JSON sin romper si viene null o malformado */

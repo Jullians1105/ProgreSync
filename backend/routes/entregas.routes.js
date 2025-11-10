@@ -40,6 +40,9 @@ router.get("/__ping", (_req, res) =>
 */
 router.post("/", upload.single("archivo"), async (req, res) => {
   try {
+    console.log('▶ POST /api/entregas - recibido');
+    console.log('  req.body keys:', Object.keys(req.body));
+    console.log('  archivo presente?:', !!req.file);
     const { titulo, descripcion, id_estudiante } = req.body;
     if (!titulo || !id_estudiante || !req.file) {
       return res.status(400).json({ error: "Faltan campos o archivo" });
@@ -56,6 +59,7 @@ router.post("/", upload.single("archivo"), async (req, res) => {
     );
 
     const nuevaId = result.insertId;
+    console.log(`  Entrega insertada id=${nuevaId} por estudiante=${id_estudiante}`);
     const usuarioId = req.session?.user?.id ?? Number(id_estudiante);
     await logCambio({
       entregaId: nuevaId,
@@ -133,11 +137,12 @@ try {
       for (const d of docentes) {
         try {
           console.log(`📨 Creando notificación para docente ${d.id}`);
-          await pool.query(
+          const [ins] = await pool.query(
             `INSERT INTO notificaciones (id_usuario, tipo, mensaje, datos, leido, fecha)
              VALUES (?,?,?,?,0,NOW())`,
             [d.id, 'nueva_entrega', mensajeBase, datos]
           );
+          console.log(`    -> notificacion insertId=${ins.insertId} affectedRows=${ins.affectedRows}`);
         } catch (e) {
           console.error('⚠️ Error al notificar al docente', d.id, ':', e?.message);
         }
