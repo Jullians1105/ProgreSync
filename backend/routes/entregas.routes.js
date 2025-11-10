@@ -22,16 +22,14 @@ import { logCambio } from "../services/historial.js";
 
 const router = Router();
 
-// Log para confirmar que este archivo sí se llegó a cargar
 console.log("✅ entregas.routes.js cargado");
 
-/* ────────────────────── Multer: almacenamiento ────────────────────── */
+/* ────────────────────── Multer ────────────────────── */
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, "uploads"), // carpeta relativa a backend/app.js
+  destination: (_req, _file, cb) => cb(null, "uploads"),
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname); // .pdf/.doc/.docx
-    const base = path
-      .basename(file.originalname, ext)
+    const ext = path.extname(file.originalname);
+    const base = path.basename(file.originalname, ext)
       .toLowerCase()
       .replace(/[^a-z0-9-_]+/gi, "-")
       .slice(0, 50);
@@ -39,20 +37,14 @@ const storage = multer.diskStorage({
     cb(null, `${base}-${unique}${ext}`);
   },
 });
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
-});
+const upload = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 } });
 
 /* ────────────────────── Diagnóstico ────────────────────── */
 router.get("/__ping", (_req, res) =>
   res.json({ ok: true, from: "entregas.routes.js" })
 );
 
-/* ────────────────────── Crear entrega (con archivo) ──────────────────────
-   POST /api/entregas
-*/
+/* ────────────────────── Crear entrega ────────────────────── */
 router.post("/", upload.single("archivo"), async (req, res) => {
   try {
     const { titulo, descripcion, id_estudiante } = req.body;
@@ -63,7 +55,6 @@ router.post("/", upload.single("archivo"), async (req, res) => {
     const archivoUrl = `/uploads/${req.file.filename}`;
     const estado = "en_revision";
 
-    // Insertar la entrega
     const [result] = await pool.query(
       `INSERT INTO entregas (id_estudiante, titulo, descripcion, archivo, estado, fecha)
        VALUES (?,?,?,?,?, NOW())`,
@@ -76,81 +67,64 @@ router.post("/", upload.single("archivo"), async (req, res) => {
       entregaId: nuevaId,
       usuarioId,
       accion: "CREAR_ENTREGA",
-      detalle: { titulo, archivo: archivoUrl }
+      detalle: { titulo, archivo: archivoUrl },
     });
 
-    // ── HISTORIAL: registrar creación ──
+    // Historial inicial
     try {
       const usuarioId2 = req.session?.user?.id ?? Number(id_estudiante);
-
-      // a) creación (estado inicial)
       await pool.query(
         `INSERT INTO historial_entregas
-          (entrega_id, usuario_id, usuario_rol, accion, campo, valor_anterior, valor_nuevo, comentario, fecha)
+         (entrega_id, usuario_id, usuario_rol, accion, campo, valor_anterior, valor_nuevo, comentario, fecha)
          VALUES (?,?,?,?,?,?,?,?, NOW())`,
-        [
-          nuevaId,
-          usuarioId2,
-          'estudiante',
-          'CREACION',
-          'estado',
-          null,
-          'en_revision',
-          JSON.stringify({ titulo, archivo: archivoUrl }),
-        ]
+        [nuevaId, usuarioId2, "estudiante", "CREACION", "estado", null, "en_revision",
+          JSON.stringify({ titulo, archivo: archivoUrl })]
       );
-
-      // b) archivo subido (opcional)
       await pool.query(
         `INSERT INTO historial_entregas
-          (entrega_id, usuario_id, usuario_rol, accion, campo, valor_anterior, valor_nuevo, comentario, fecha)
-          VALUES (?,?,?,?,?,?,?,?, NOW())`,
-        [
-          nuevaId,
-          usuarioId2,
-          'estudiante',
-          'CAMBIO_ARCHIVO',
-          'archivo',
-          null,
-          archivoUrl,
-          'Archivo subido por el estudiante',
-        ]
+         (entrega_id, usuario_id, usuario_rol, accion, campo, valor_anterior, valor_nuevo, comentario, fecha)
+         VALUES (?,?,?,?,?,?,?,?, NOW())`,
+        [nuevaId, usuarioId2, "estudiante", "CAMBIO_ARCHIVO", "archivo", null, archivoUrl,
+          "Archivo subido por el estudiante"]
       );
     } catch (e) {
       console.warn("⚠️ No se pudo registrar historial de creación:", e?.message);
     }
 
-    // NOTIFICAR a docentes
+    // Notificar docentes
     try {
       const [[stu]] = await pool.query(
         `SELECT nombre FROM usuarios WHERE id = ? LIMIT 1`,
         [id_estudiante]
       );
-      const estudianteNombre = stu?.nombre ?? 'Estudiante';
-
+      const estudianteNombre = stu?.nombre ?? "Estudiante";
       const [docentes] = await pool.query(
         `SELECT id FROM usuarios WHERE rol = 'docente'`
       );
-      if (docentes.length === 0) console.warn('⚠️ No hay docentes registrados para notificar');
 
       const datos = JSON.stringify({
-        entrega_id: nuevaId, id_estudiante, tipo: 'nueva_entrega', titulo, estudiante: estudianteNombre
+        entrega_id: nuevaId,
+        id_estudiante,
+        tipo: "nueva_entrega",
+        titulo,
+        estudiante: estudianteNombre,
       });
-      const mensajeBase = `Nueva entrega pendiente de revisión: "${titulo}" del estudiante ${estudianteNombre}`;
+      const mensajeBase =
+        `Nueva entrega pendiente de revisión: "${titulo}" del estudiante ${estudianteNombre}`;
 
       for (const d of docentes) {
         try {
           await pool.query(
             `INSERT INTO notificaciones (id_usuario, tipo, mensaje, datos, leido, fecha)
              VALUES (?,?,?,?,0,NOW())`,
-            [d.id, 'nueva_entrega', mensajeBase, datos]
+            [d.id, "nueva_entrega", mensajeBase, datos]
           );
         } catch (e) {
-          console.error('⚠️ Error al notificar al docente', d.id, ':', e?.message);
+          console.error("⚠️ Error al notificar al docente", d.id, ":", e?.message);
         }
       }
     } catch (e) {
-      console.error('⚠️ Error al crear notificaciones para docentes:', e?.message);
+      console.error("⚠️ Error al crear notificaciones para docentes:", e?.message);
     }
 
     return res.status(201).json({ ok: true, archivo: archivoUrl });
@@ -160,9 +134,7 @@ router.post("/", upload.single("archivo"), async (req, res) => {
   }
 });
 
-/* ────────────────────── Listar mis entregas ──────────────────────
-   GET /api/entregas/mis/:id_estudiante
-*/
+/* ────────────────────── Listar mis entregas ────────────────────── */
 router.get("/mis/:id_estudiante", async (req, res) => {
   try {
     const { id_estudiante } = req.params;
@@ -180,9 +152,7 @@ router.get("/mis/:id_estudiante", async (req, res) => {
   }
 });
 
-/* ────────────────────── Pendientes para docente ──────────────────────
-   GET /api/entregas/pendientes
-*/
+/* ────────────────────── Pendientes/Aprobadas/Rechazadas ────────────────────── */
 router.get("/pendientes", async (_req, res) => {
   try {
     const [rows] = await pool.query(
@@ -200,9 +170,6 @@ router.get("/pendientes", async (_req, res) => {
   }
 });
 
-/* ────────────────────── Entregas aprobadas ──────────────────────
-   GET /api/entregas/aprobadas
-*/
 router.get("/aprobadas", async (_req, res) => {
   try {
     const [rows] = await pool.query(
@@ -221,9 +188,6 @@ router.get("/aprobadas", async (_req, res) => {
   }
 });
 
-/* ────────────────────── Entregas rechazadas ──────────────────────
-   GET /api/entregas/rechazadas
-*/
 router.get("/rechazadas", async (_req, res) => {
   try {
     const [rows] = await pool.query(
@@ -242,9 +206,7 @@ router.get("/rechazadas", async (_req, res) => {
   }
 });
 
-/* ────────────────────── Historial por entrega ──────────────────────
-   GET /api/entregas/:id/historial
-*/
+/* ────────────────────── Historial por entrega ────────────────────── */
 router.get("/:id/historial", async (req, res) => {
   try {
     const entregaId = Number(req.params.id);
@@ -256,26 +218,16 @@ router.get("/:id/historial", async (req, res) => {
 
     const [rows] = await pool.query(
       `
-      SELECT
-        h.id,
-        h.entrega_id,
-        h.usuario_id,
-        u.nombre AS usuario_nombre,
-        h.usuario_rol,
-        h.accion,
-        h.campo,
-        h.valor_anterior,
-        h.valor_nuevo,
-        h.comentario,
-        h.fecha,
-        CASE WHEN h.campo = 'estado' THEN h.valor_anterior ELSE NULL END AS estado_anterior,
-        CASE WHEN h.campo = 'estado' THEN h.valor_nuevo    ELSE NULL END AS estado_nuevo
+      SELECT h.id, h.entrega_id, h.usuario_id, u.nombre AS usuario_nombre,
+             h.usuario_rol, h.accion, h.campo, h.valor_anterior, h.valor_nuevo,
+             h.comentario, h.fecha,
+             CASE WHEN h.campo = 'estado' THEN h.valor_anterior ELSE NULL END AS estado_anterior,
+             CASE WHEN h.campo = 'estado' THEN h.valor_nuevo    ELSE NULL END AS estado_nuevo
       FROM historial_entregas h
       LEFT JOIN usuarios u ON u.id = h.usuario_id
       WHERE h.entrega_id = ?
       ORDER BY h.fecha DESC
-      LIMIT ? OFFSET ?
-      `,
+      LIMIT ? OFFSET ?`,
       [entregaId, limit, offset]
     );
 
@@ -286,56 +238,39 @@ router.get("/:id/historial", async (req, res) => {
   }
 });
 
-/* ────────────────────── Cambiar estado (Docente) ──────────────────────
-   PATCH /api/entregas/:id/estado
-*/
+/* ────────────────────── Cambiar estado ────────────────────── */
 router.patch("/:id/estado", async (req, res) => {
   try {
-    // 0) Verificar sesión del usuario (desde sesión o headers)
-    const usuarioId = req.session?.user?.id || req.body?.usuario_id || req.headers['x-user-id'];
-    const usuarioRol = req.session?.user?.rol || req.headers['x-user-role'];
-
-    if (!usuarioId) {
-      return res.status(401).json({ error: "No autenticado. Por favor, inicia sesión nuevamente." });
-    }
-    if (usuarioRol !== 'docente' && usuarioRol !== 'admin') {
+    const usuarioId = req.session?.user?.id || req.body?.usuario_id || req.headers["x-user-id"];
+    const usuarioRol = req.session?.user?.rol || req.headers["x-user-role"];
+    if (!usuarioId) return res.status(401).json({ error: "No autenticado. Por favor, inicia sesión nuevamente." });
+    if (usuarioRol !== "docente" && usuarioRol !== "admin") {
       return res.status(403).json({ error: "Solo los docentes pueden calificar entregas." });
     }
 
-    // 1) ID válido
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: "ID inválido" });
 
-    // 2) Mapeo del estado del front → valores en BD
     const estadoIn = String(req.body?.estado || "").toLowerCase();
     let dbEstado = "en_revision";
     if (estadoIn.includes("aprob")) dbEstado = "aprobado";
     else if (estadoIn.includes("rechaz")) dbEstado = "rechazado";
 
-    // 3) Comentario opcional
     const comentario = String(req.body?.comentario || "").trim() || null;
 
-    // 4) Obtener estado/comentario actuales
     const [[actual]] = await pool.query(
       `SELECT estado AS estado_actual, comentario_docente AS comentario_actual
-         FROM entregas
-        WHERE id = ? LIMIT 1`,
+       FROM entregas WHERE id = ? LIMIT 1`,
       [id]
     );
     if (!actual) return res.status(404).json({ error: "Entrega no encontrada" });
 
-    // 5) Actualizar entrega
     const [result] = await pool.query(
-      `UPDATE entregas
-         SET estado = ?, comentario_docente = ?
-       WHERE id = ?`,
+      `UPDATE entregas SET estado = ?, comentario_docente = ? WHERE id = ?`,
       [dbEstado, comentario, id]
     );
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: "Entrega no encontrada" });
-    }
+    if (result.affectedRows === 0) return res.status(404).json({ error: "Entrega no encontrada" });
 
-    // Notificación para el estudiante
     try {
       const [entRows] = await pool.query(
         `SELECT id_estudiante, titulo FROM entregas WHERE id = ? LIMIT 1`,
@@ -343,8 +278,7 @@ router.patch("/:id/estado", async (req, res) => {
       );
       const entrega = entRows[0];
       if (entrega) {
-        const mensaje = `Tu entrega "${entrega.titulo}" cambió a ${dbEstado}.` +
-          (comentario ? ` Comentario: ${comentario}` : "");
+        const mensaje = `Tu entrega "${entrega.titulo}" cambió a ${dbEstado}.` + (comentario ? ` Comentario: ${comentario}` : "");
         const datos = JSON.stringify({ entrega_id: id, nuevo_estado: dbEstado });
         await pool.query(
           `INSERT INTO notificaciones (id_usuario, tipo, mensaje, datos, leido, fecha)
@@ -356,28 +290,17 @@ router.patch("/:id/estado", async (req, res) => {
       console.error("Error creando notificación:", errNotify);
     }
 
-    // 6) Registrar en historial
     try {
       await pool.query(
         `INSERT INTO historial_entregas
-          (entrega_id, usuario_id, usuario_rol, accion, campo, valor_anterior, valor_nuevo, comentario, fecha)
-          VALUES (?,?,?,?,?,?,?,?, NOW())`,
-        [
-          id,
-          usuarioId,
-          usuarioRol,
-          'CAMBIO_ESTADO',
-          'estado',
-          actual.estado_actual ?? null,
-          dbEstado,
-          comentario,
-        ]
+         (entrega_id, usuario_id, usuario_rol, accion, campo, valor_anterior, valor_nuevo, comentario, fecha)
+         VALUES (?,?,?,?,?,?,?,?, NOW())`,
+        [id, usuarioId, usuarioRol, "CAMBIO_ESTADO", "estado", actual.estado_actual ?? null, dbEstado, comentario]
       );
     } catch (e) {
       console.warn("⚠️ No se pudo registrar historial de cambio:", e?.message);
     }
 
-    // 7) Respuesta
     return res.json({ ok: true, id, estado: dbEstado, comentario });
   } catch (err) {
     console.error("Error PATCH /api/entregas/:id/estado:", err);
@@ -385,39 +308,34 @@ router.patch("/:id/estado", async (req, res) => {
   }
 });
 
-/* ────────────────────── Exportar PDF del historial (bonito) ──────────────────────
-   GET /api/entregas/:id/reporte.pdf
-*/
+/* ────────────────────── Exportar PDF bonito (ajustado a página) ────────────────────── */
 router.get("/:id/reporte.pdf", async (req, res) => {
   try {
     const entregaId = Number(req.params.id);
     if (!entregaId) return res.status(400).json({ error: "ID inválido" });
 
-    // 1) Encabezado de la entrega
     const [[header]] = await pool.query(
       `SELECT e.id, e.titulo, e.descripcion, e.estado, e.archivo, e.fecha,
               u.nombre AS estudiante_nombre, u.email AS estudiante_email
-         FROM entregas e
-         LEFT JOIN usuarios u ON u.id = e.id_estudiante
-        WHERE e.id = ? LIMIT 1`,
+       FROM entregas e
+       LEFT JOIN usuarios u ON u.id = e.id_estudiante
+       WHERE e.id = ? LIMIT 1`,
       [entregaId]
     );
     if (!header) return res.status(404).json({ error: "Entrega no encontrada" });
 
-    // 2) Historial
     const [historial] = await pool.query(
       `SELECT h.id, h.entrega_id, h.usuario_id, u.nombre AS usuario_nombre,
               h.usuario_rol, h.accion, h.campo, h.valor_anterior, h.valor_nuevo,
               h.comentario, h.fecha
-         FROM historial_entregas h
-         LEFT JOIN usuarios u ON u.id = h.usuario_id
-        WHERE h.entrega_id = ?
-        ORDER BY h.fecha DESC
-        LIMIT 2000`,
+       FROM historial_entregas h
+       LEFT JOIN usuarios u ON u.id = h.usuario_id
+       WHERE h.entrega_id = ?
+       ORDER BY h.fecha DESC
+       LIMIT 2000`,
       [entregaId]
     );
 
-    // 3) Nombre del archivo
     const base = sanitizeFilename(header.titulo || `entrega_${entregaId}`);
     const stamp = dayjs().format("YYYY-MM-DD_HH-mm");
     const filename = `${base}__${stamp}.pdf`;
@@ -425,61 +343,48 @@ router.get("/:id/reporte.pdf", async (req, res) => {
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
-    // 4) Generar PDF con estilo
     const doc = new PDFDocument({
       size: "A4",
-      margin: 50,
+      margin: 56,            // un poco más amplio para no apurar bordes
       bufferPages: true,
       info: {
         Title: `Historial de entrega: ${header.titulo || "-"}`,
         Author: "ProgreSync",
         Creator: "ProgreSync",
-      }
+      },
     });
     doc.pipe(res);
 
-    /* ========= helpers de estilo ========= */
+    /* ====== helpers ====== */
     const COLOR = {
-      primary: "#1f2937",  // gris oscuro
-      accent:  "#f59e0b",  // naranja
-      muted:   "#6b7280",  // gris medio
-      good:    "#16a34a",  // verde
-      warn:    "#f59e0b",  // naranja
-      bad:     "#dc2626",  // rojo
-      line:    "#e5e7eb",  // gris claro
-      zebra:   "#f8fafc"
+      primary: "#1f2937",
+      accent:  "#f59e0b",
+      muted:   "#6b7280",
+      good:    "#16a34a",
+      warn:    "#f59e0b",
+      bad:     "#dc2626",
+      line:    "#e5e7eb",
+      zebra:   "#f8fafc",
     };
 
-    const CONTENT_W = () => doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const PAGE_X = doc.page.margins.left;
+    const PAGE_W = doc.page.width - doc.page.margins.left - doc.page.margins.right;
 
-    function hr(yPad=10) {
-      doc.moveDown(yPad/14);
+    function hr() {
       const y = doc.y;
-      doc.strokeColor(COLOR.line).lineWidth(1).moveTo(doc.page.margins.left, y)
-         .lineTo(doc.page.width - doc.page.margins.right, y).stroke();
-      doc.moveDown(yPad/14);
+      doc.strokeColor(COLOR.line).lineWidth(1)
+        .moveTo(PAGE_X, y).lineTo(PAGE_X + PAGE_W, y).stroke();
+      doc.moveDown(0.6);
     }
-    function kv(label, value) {
-      doc.fillColor(COLOR.muted).font("Helvetica").fontSize(10).text(label, {continued:true});
-      doc.fillColor(COLOR.primary).font("Helvetica-Bold").fontSize(11).text(` ${value ?? "-"}`);
-    }
-    function badge(text, type="muted") {
+    function badge(text, type = "muted") {
       const bg = type === "good" ? "#dcfce7" : type === "bad" ? "#fee2e2" : type === "warn" ? "#fef3c7" : "#e5e7eb";
       const fg = type === "good" ? COLOR.good : type === "bad" ? COLOR.bad : type === "warn" ? COLOR.warn : COLOR.primary;
       const x = doc.x, y = doc.y;
-      const padX = 6, padY = 3;
-      const w = doc.widthOfString(String(text)) + padX*2;
-      const h = doc.currentLineHeight() + padY*2;
-
-      doc.save();
-      if (typeof doc.roundedRect === "function") {
-        doc.roundedRect(x, y, w, h, 4).fill(bg);
-      } else {
-        doc.rect(x, y, w, h).fill(bg);
-      }
-      doc.restore();
-
-      doc.fillColor(fg).text(text, x+padX, y+padY);
+      const padX = 6, padY = 2;
+      const w = doc.widthOfString(String(text)) + padX * 2;
+      const h = doc.currentLineHeight() + padY * 2;
+      doc.save().rect(x, y, w, h).fill(bg).restore();
+      doc.fillColor(fg).text(text, x + padX, y + padY);
       doc.moveDown(0.2);
     }
     function pageFooter() {
@@ -490,142 +395,135 @@ router.get("/:id/reporte.pdf", async (req, res) => {
         const text = `ProgreSync · ${dayjs().format("DD/MM/YYYY HH:mm")} · Página ${pageNum} de ${range.count}`;
         doc.font("Helvetica").fontSize(9).fillColor(COLOR.muted);
         const w = doc.widthOfString(text);
-        doc.text(text, doc.page.width - doc.page.margins.right - w, doc.page.height - doc.page.margins.bottom + 15);
+        doc.text(text, PAGE_X + PAGE_W - w, doc.page.height - doc.page.margins.bottom + 12);
       }
     }
 
-    /* ========= Encabezado ========= */
-    doc.font("Helvetica-Bold").fontSize(22).fillColor(COLOR.primary).text("Progre", {continued:true});
+    /* ====== Encabezado ====== */
+    doc.font("Helvetica-Bold").fontSize(22).fillColor(COLOR.primary).text("Progre", { continued: true });
     doc.fillColor(COLOR.accent).text("Sync");
-    doc.moveDown(0.5);
+    doc.moveDown(0.3);
     doc.font("Helvetica-Bold").fontSize(16).fillColor(COLOR.primary).text("Reporte de historial de entrega");
-    hr(6);
+    doc.moveDown(0.6);
 
-    // Fila izquierda/derecha
-    const leftX = doc.x; const colW = 280;
-    // Columna izquierda: metadatos
-    doc.fontSize(11).fillColor(COLOR.primary);
-    kv("Título:", header.titulo || "-");
-    kv("Estudiante:", `${header.estudiante_nombre || "-"} <${header.estudiante_email || "-"}>`);
-    kv("Archivo:", header.archivo || "-");
-    kv("Fecha de creación:", header.fecha ? dayjs(header.fecha).format("DD/MM/YYYY HH:mm") : "-");
-    kv("Exportado:", dayjs().format("DD/MM/YYYY HH:mm"));
+    // Dos columnas dentro del ancho de página (sin líneas entre filas)
+    const COL_A_W = Math.min(320, PAGE_W * 0.55);
+    const GAP = 24;
+    const COL_B_X = PAGE_X + COL_A_W + GAP;
+    const startY = doc.y;
 
-    // Columna derecha: Estado (badge)
-    doc.moveUp(5);
-    doc.x = leftX + colW + 20;
+    // Columna izquierda (usa width fijo para evitar desbordes)
+    doc.x = PAGE_X; doc.y = startY;
+    doc.font("Helvetica").fontSize(10).fillColor(COLOR.muted).text("Título:", { continued: true });
+    doc.font("Helvetica-Bold").fillColor(COLOR.primary).text(` ${header.titulo || "-"}`, { width: COL_A_W });
+
+    doc.font("Helvetica").fillColor(COLOR.muted).text("Estudiante:", { continued: true });
+    doc.font("Helvetica-Bold").fillColor(COLOR.primary)
+      .text(` ${header.estudiante_nombre || "-"} <${header.estudiante_email || "-"}>`, { width: COL_A_W });
+
+    doc.font("Helvetica").fillColor(COLOR.muted).text("Archivo:", { continued: true });
+    doc.font("Helvetica").fillColor(COLOR.primary).text(` ${header.archivo || "-"}`, { width: COL_A_W });
+
+    doc.font("Helvetica").fillColor(COLOR.muted).text("Fecha de creación:", { continued: true });
+    doc.font("Helvetica-Bold").fillColor(COLOR.primary)
+      .text(` ${header.fecha ? dayjs(header.fecha).format("DD/MM/YYYY HH:mm") : "-"}`, { width: COL_A_W });
+
+    doc.font("Helvetica").fillColor(COLOR.muted).text("Exportado:", { continued: true });
+    doc.font("Helvetica-Bold").fillColor(COLOR.primary).text(` ${dayjs().format("DD/MM/YYYY HH:mm")}`, { width: COL_A_W });
+
+    // Columna derecha
+    doc.x = COL_B_X; doc.y = startY;
     doc.font("Helvetica-Bold").fontSize(11).fillColor(COLOR.primary).text("Estado actual:");
     const stateMap = { aprobado: "good", en_revision: "warn", rechazado: "bad" };
     badge((header.estado || "—"), stateMap[header.estado] || "muted");
+    doc.moveDown(0.8);
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(COLOR.primary).text("Descripción");
+    doc.moveDown(0.2);
+    doc.font("Helvetica").fontSize(10.5).fillColor(COLOR.primary)
+      .text(String(header.descripcion || "—"), { width: PAGE_W - COL_A_W - GAP });
 
-    hr(12);
+    // Línea suave solo al final del bloque
+    doc.moveDown(0.6);
+    hr();
 
-    // Descripción (si hay)
-    if ((header.descripcion || "").trim()) {
-      doc.font("Helvetica-Bold").fontSize(12).fillColor(COLOR.primary).text("Descripción");
+    /* ====== Tabla historial ====== */
+    doc.font("Helvetica-Bold").fontSize(13).fillColor(COLOR.primary).text("Historial de cambios");
+    doc.moveDown(0.3);
+
+    // Anchos que caben en la página (suma = PAGE_W ≈ 483)
+    const columns = [
+      { key: "fecha",    label: "Fecha",    width: 80 },
+      { key: "accion",   label: "Acción",   width: 70 },
+      { key: "campo",    label: "Campo",    width: 60 },
+      { key: "anterior", label: "Anterior", width: 95 },
+      { key: "nuevo",    label: "Nuevo",    width: 95 },
+      { key: "autor",    label: "Autor",    width: PAGE_W - (80 + 70 + 60 + 95 + 95) }, // resto
+    ];
+
+    function tableHeader() {
+      const y = doc.y;
+      doc.save()
+        .rect(PAGE_X, y - 3, PAGE_W, 20)
+        .fill("#f3f4f6")
+        .restore();
+      doc.x = PAGE_X;
+      columns.forEach((col, i) => {
+        doc.font("Helvetica-Bold").fontSize(10).fillColor(COLOR.primary)
+          .text(col.label, doc.x, y, { continued: i !== columns.length - 1, width: col.width });
+      });
+      doc.text("");
       doc.moveDown(0.2);
-      doc.font("Helvetica").fontSize(11).fillColor(COLOR.primary)
-        .text(String(header.descripcion), {align:"justify"});
-      hr(12);
     }
 
-    /* ========= Tabla historial (alineada) ========= */
-    doc.font("Helvetica-Bold").fontSize(13).fillColor(COLOR.primary).text("Historial de cambios");
-    doc.moveDown(0.5);
-
-    // Dimensiones de tabla
-    const gap = 6; // espacio entre columnas
-    const widths = [70, 75, 60, 95, 95, 70]; // Fecha, Acción, Campo, Anterior, Nuevo, Autor
-    const labels = ["Fecha", "Acción", "Campo", "Anterior", "Nuevo", "Autor"];
-    const startX = doc.x;
-    const maxW = CONTENT_W();
-
-    // Encabezado
-    const headerY = doc.y;
-    doc.save().rect(startX - 2, headerY - 4, maxW + 4, 22).fill("#f3f4f6").restore();
-    let x = startX;
-    labels.forEach((txt, i) => {
-      doc.font("Helvetica-Bold").fontSize(10).fillColor(COLOR.primary)
-         .text(txt, x, headerY, { width: widths[i], align: "left" });
-      x += widths[i] + gap;
-    });
-    const afterHeaderY = headerY + 18;
-    doc.moveTo(startX, afterHeaderY).lineTo(startX + maxW, afterHeaderY).strokeColor(COLOR.line).lineWidth(1).stroke();
-    doc.y = afterHeaderY + 4;
-
-    function ensureSpace(rowH) {
-      if (doc.y + rowH > doc.page.height - doc.page.margins.bottom) {
+    function ensureSpace(lines = 2) {
+      const lineH = 14;
+      if (doc.y > doc.page.height - doc.page.margins.bottom - lines * lineH) {
         doc.addPage();
       }
     }
 
-    function printRow(row, zebra = false) {
-      const padX = 3, padY = 2;
-      // calcular altura de cada celda
-      const heights = [
-        doc.heightOfString(row.fecha,   { width: widths[0] - padX*2 }),
-        doc.heightOfString(row.accion,  { width: widths[1] - padX*2 }),
-        doc.heightOfString(row.campo,   { width: widths[2] - padX*2 }),
-        doc.heightOfString(row.anterior,{ width: widths[3] - padX*2 }),
-        doc.heightOfString(row.nuevo,   { width: widths[4] - padX*2 }),
-        doc.heightOfString(row.autor,   { width: widths[5] - padX*2 }),
-      ];
-      const rowH = Math.max(...heights) + padY*2 + 2; // +2 por línea base
-
-      ensureSpace(rowH + 12);
-
+    function tableRow(row, zebra = false) {
       const y = doc.y;
       if (zebra) {
-        doc.save().rect(startX - 2, y - 2, maxW + 4, rowH + 4).fill(COLOR.zebra).restore();
+        doc.save().rect(PAGE_X, y - 2, PAGE_W, doc.currentLineHeight() + 6).fill(COLOR.zebra).restore();
       }
-
-      // bordes inferiores sutiles
-      doc.save().strokeColor(COLOR.line).lineWidth(0.6)
-        .moveTo(startX, y + rowH + 1).lineTo(startX + maxW, y + rowH + 1).stroke().restore();
-
-      // dibujar cada celda
-      let cx = startX;
-      const vals = [row.fecha, row.accion, row.campo, row.anterior, row.nuevo, row.autor];
-      vals.forEach((val, i) => {
+      doc.x = PAGE_X;
+      columns.forEach((col, i) => {
+        const txt = String(row[col.key] ?? "");
         doc.font("Helvetica").fontSize(10).fillColor(COLOR.primary)
-           .text(String(val ?? ""), cx + padX, y + padY, { width: widths[i] - padX*2, align: "left" });
-        cx += widths[i] + gap;
+          .text(txt, doc.x, y, { continued: i !== columns.length - 1, width: col.width });
       });
-
-      doc.y = y + rowH + 6;
-
-      // comentario (si existe)
-      if ((row.comentario || "").trim()) {
-        const cText = `Comentario: ${row.comentario}`;
-        const cH = doc.heightOfString(cText, { width: maxW });
-        ensureSpace(cH + 8);
-        doc.font("Helvetica-Oblique").fontSize(10).fillColor(COLOR.muted)
-           .text(cText, startX, doc.y, { width: maxW });
-        doc.y += 6;
-      }
+      doc.text("");
     }
+
+    tableHeader();
 
     if (!historial.length) {
-      printRow(
-        { fecha: "—", accion: "—", campo: "—", anterior: "—", nuevo: "—", autor: "—", comentario: "" },
-        false
-      );
+      tableRow({ fecha: "—", accion: "—", campo: "—", anterior: "—", nuevo: "—", autor: "—" });
     } else {
       historial.forEach((h, idx) => {
+        ensureSpace(4);
         const row = {
-          fecha:  h.fecha ? dayjs(h.fecha).format("DD/MM/YYYY HH:mm") : "-",
+          fecha: h.fecha ? dayjs(h.fecha).format("DD/MM/YYYY HH:mm") : "-",
           accion: h.accion || "",
-          campo:  h.campo || "",
+          campo: h.campo || "",
           anterior: h.valor_anterior || "",
-          nuevo:    h.valor_nuevo || "",
-          autor:  h.usuario_nombre ? `${h.usuario_nombre} (${h.usuario_rol || ""})` : (h.usuario_rol || "-"),
-          comentario: h.comentario || ""
+          nuevo: h.valor_nuevo || "",
+          autor: h.usuario_nombre ? `${h.usuario_nombre} (${h.usuario_rol || ""})` : (h.usuario_rol || "-"),
         };
-        printRow(row, idx % 2 === 1);
+        tableRow(row, idx % 2 === 1);
+
+        // Comentario debajo, sin bordes
+        if ((h.comentario || "").trim()) {
+          ensureSpace(2);
+          doc.moveDown(0.1);
+          doc.font("Helvetica-Oblique").fontSize(10).fillColor(COLOR.muted)
+            .text(`Comentario: ${h.comentario}`, PAGE_X, doc.y, { width: PAGE_W });
+          doc.moveDown(0.2);
+        }
       });
     }
 
-    // Pie de página (número de páginas)
     pageFooter();
     doc.end();
   } catch (err) {
