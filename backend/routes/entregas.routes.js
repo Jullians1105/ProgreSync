@@ -1,13 +1,15 @@
 // backend/routes/entregas.routes.js
+
 // === AÑADIDOS PARA PDF ===
 import PDFDocument from "pdfkit";
 import dayjs from "dayjs";
 import "dayjs/locale/es.js";
 dayjs.locale("es");
+
 function sanitizeFilename(s = "") {
   return String(s)
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\w\-]+/g, "_")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // quita tildes
+    .replace(/[^\w\-]+/g, "_")                        // deja solo seguros
     .slice(0, 80);
 }
 // =========================
@@ -25,8 +27,8 @@ console.log("✅ entregas.routes.js cargado");
 
 /* ────────────────────── Multer: almacenamiento ────────────────────── */
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads"), // carpeta relativa a backend/app.js
-  filename: (req, file, cb) => {
+  destination: (_req, _file, cb) => cb(null, "uploads"), // carpeta relativa a backend/app.js
+  filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname); // .pdf/.doc/.docx
     const base = path
       .basename(file.originalname, ext)
@@ -118,12 +120,17 @@ router.post("/", upload.single("archivo"), async (req, res) => {
       console.warn("⚠️ No se pudo registrar historial de creación:", e?.message);
     }
 
-    // NOTIFICAR a docentes: hay una nueva entrega en revisión
+    // NOTIFICAR a docentes
     try {
-      const [[stu]] = await pool.query(`SELECT nombre FROM usuarios WHERE id = ? LIMIT 1`, [id_estudiante]);
+      const [[stu]] = await pool.query(
+        `SELECT nombre FROM usuarios WHERE id = ? LIMIT 1`,
+        [id_estudiante]
+      );
       const estudianteNombre = stu?.nombre ?? 'Estudiante';
 
-      const [docentes] = await pool.query(`SELECT id FROM usuarios WHERE rol = 'docente'`);
+      const [docentes] = await pool.query(
+        `SELECT id FROM usuarios WHERE rol = 'docente'`
+      );
       if (docentes.length === 0) console.warn('⚠️ No hay docentes registrados para notificar');
 
       const datos = JSON.stringify({
@@ -378,7 +385,7 @@ router.patch("/:id/estado", async (req, res) => {
   }
 });
 
-/* ────────────────────── Exportar PDF del historial ──────────────────────
+/* ────────────────────── Exportar PDF del historial (bonito) ──────────────────────
    GET /api/entregas/:id/reporte.pdf
 */
 router.get("/:id/reporte.pdf", async (req, res) => {
@@ -410,10 +417,8 @@ router.get("/:id/reporte.pdf", async (req, res) => {
       [entregaId]
     );
 
-    // 3) Nombre del archivo
-    const base = (header.titulo || `entrega_${entregaId}`)
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^\w\-]+/g, "_").slice(0, 80);
+    // 3) Nombre del archivo (usa helper saneado)
+    const base = sanitizeFilename(header.titulo || `entrega_${entregaId}`);
     const stamp = dayjs().format("YYYY-MM-DD_HH-mm");
     const filename = `${base}__${stamp}.pdf`;
 
@@ -435,13 +440,13 @@ router.get("/:id/reporte.pdf", async (req, res) => {
 
     /* ========= helpers de estilo ========= */
     const COLOR = {
-      primary: "#1f2937",   // gris oscuro
-      accent:  "#f59e0b",   // naranja
-      muted:   "#6b7280",   // gris medio
-      good:    "#16a34a",   // verde
-      warn:    "#f59e0b",   // naranja
-      bad:     "#dc2626",   // rojo
-      line:    "#e5e7eb",   // gris claro
+      primary: "#1f2937",  // gris oscuro
+      accent:  "#f59e0b",  // naranja
+      muted:   "#6b7280",  // gris medio
+      good:    "#16a34a",  // verde
+      warn:    "#f59e0b",  // naranja
+      bad:     "#dc2626",  // rojo
+      line:    "#e5e7eb",  // gris claro
       zebra:   "#f8fafc"
     };
 
@@ -480,7 +485,6 @@ router.get("/:id/reporte.pdf", async (req, res) => {
     }
 
     /* ========= Encabezado ========= */
-    // “logo” tipográfico simple (no requiere imagen)
     doc.font("Helvetica-Bold").fontSize(22).fillColor(COLOR.primary).text("Progre", {continued:true});
     doc.fillColor(COLOR.accent).text("Sync");
     doc.moveDown(0.5);
@@ -555,7 +559,6 @@ router.get("/:id/reporte.pdf", async (req, res) => {
     }
 
     function ensureSpace(lines=1.4) {
-      // fuerza salto si quedamos sin espacio visual para otra fila + comentario
       if (doc.y > doc.page.height - doc.page.margins.bottom - lines*14) doc.addPage();
     }
 
@@ -565,7 +568,6 @@ router.get("/:id/reporte.pdf", async (req, res) => {
       tableRow({fecha:"—", accion:"—", campo:"—", anterior:"—", nuevo:"—", autor:"—"});
     } else {
       historial.forEach((h, idx) => {
-        // Salto prudente entre filas si se llena la página
         ensureSpace(3);
         const row = {
           fecha:  h.fecha ? dayjs(h.fecha).format("DD/MM/YYYY HH:mm") : "-",
@@ -577,7 +579,6 @@ router.get("/:id/reporte.pdf", async (req, res) => {
         };
         tableRow(row, idx % 2 === 1);
 
-        // Comentario asociado (ocupa toda la fila, debajo)
         if ((h.comentario || "").trim()) {
           ensureSpace(2);
           doc.moveDown(0.15);
@@ -588,7 +589,7 @@ router.get("/:id/reporte.pdf", async (req, res) => {
       });
     }
 
-    // Render pies de página
+    // Pie de página (número de páginas)
     pageFooter();
     doc.end();
   } catch (err) {
