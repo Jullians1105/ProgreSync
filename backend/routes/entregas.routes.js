@@ -397,7 +397,7 @@ router.get("/:id/reporte.pdf", async (req, res) => {
     );
     if (!header) return res.status(404).json({ error: "Entrega no encontrada" });
 
-    // 2) Historial (usa h.fecha; si no existiera, cambia a h.created_at AS fecha)
+    // 2) Historial
     const [historial] = await pool.query(
       `SELECT h.id, h.entrega_id, h.usuario_id, u.nombre AS usuario_nombre,
               h.usuario_rol, h.accion, h.campo, h.valor_anterior, h.valor_nuevo,
@@ -406,82 +406,190 @@ router.get("/:id/reporte.pdf", async (req, res) => {
          LEFT JOIN usuarios u ON u.id = h.usuario_id
         WHERE h.entrega_id = ?
         ORDER BY h.fecha DESC
-        LIMIT 1000`,
+        LIMIT 2000`,
       [entregaId]
     );
 
     // 3) Nombre del archivo
-    const base = sanitizeFilename(header.titulo || `entrega_${entregaId}`);
+    const base = (header.titulo || `entrega_${entregaId}`)
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^\w\-]+/g, "_").slice(0, 80);
     const stamp = dayjs().format("YYYY-MM-DD_HH-mm");
     const filename = `${base}__${stamp}.pdf`;
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
-    // 4) Generar PDF
-    const doc = new PDFDocument({ margin: 48, size: "A4" });
+    // 4) Generar PDF con estilo
+    const doc = new PDFDocument({
+      size: "A4",
+      margin: 50,
+      bufferPages: true,
+      info: {
+        Title: `Historial de entrega: ${header.titulo || "-"}`,
+        Author: "ProgreSync",
+        Creator: "ProgreSync",
+      }
+    });
     doc.pipe(res);
 
-    // Portada
-    doc.fontSize(18).text("Reporte de historial de entrega", { align: "center" });
-    doc.moveDown(1);
+    /* ========= helpers de estilo ========= */
+    const COLOR = {
+      primary: "#1f2937",   // gris oscuro
+      accent:  "#f59e0b",   // naranja
+      muted:   "#6b7280",   // gris medio
+      good:    "#16a34a",   // verde
+      warn:    "#f59e0b",   // naranja
+      bad:     "#dc2626",   // rojo
+      line:    "#e5e7eb",   // gris claro
+      zebra:   "#f8fafc"
+    };
 
-    doc.fontSize(12)
-      .text(`Título: ${header.titulo || "-"}`).moveDown(0.2)
-      .text(`Estudiante: ${header.estudiante_nombre || "-"} <${header.estudiante_email || "-"}>`).moveDown(0.2)
-      .text(`Estado actual: ${header.estado || "-"}`).moveDown(0.2)
-      .text(`Archivo: ${header.archivo || "-"}`).moveDown(0.2)
-      .text(`Fecha de creación: ${header.fecha ? dayjs(header.fecha).format("DD/MM/YYYY HH:mm") : "-"}`).moveDown(0.2)
-      .text(`Exportado: ${dayjs().format("DD/MM/YYYY HH:mm")}`).moveDown(1);
-
-    if (header.descripcion) {
-      doc.fontSize(12).text("Descripción:", { underline: true }).moveDown(0.2);
-      doc.fontSize(11).text(String(header.descripcion), { align: "justify" }).moveDown(0.6);
-    }
-
-    // Tabla de historial
-    doc.addPage();
-    doc.fontSize(14).text("Historial de cambios", { underline: true }).moveDown(0.4);
-
-    const colW = [105, 85, 70, 120, 120, 120]; // Fecha, Acción, Campo, Anterior, Nuevo, Autor
-    const startX = doc.x;
-
-    function drawRow(cells, bold = false) {
+    function hr(yPad=10) {
+      doc.moveDown(yPad/14);
       const y = doc.y;
-      let x = startX;
-      const heights = cells.map((c, i) =>
-        doc.heightOfString(String(c ?? ""), { width: colW[i] - 6 })
-      );
-      const rowH = Math.max(...heights) + 8;
-
-      cells.forEach((c, i) => {
-        doc.rect(x, y, colW[i], rowH).strokeColor("#DDD").stroke();
-        doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(10).fillColor("#000");
-        doc.text(String(c ?? ""), x + 4, y + 4, { width: colW[i] - 6 });
-        x += colW[i];
-      });
-      doc.y = y + rowH;
+      doc.strokeColor(COLOR.line).lineWidth(1).moveTo(doc.page.margins.left, y)
+         .lineTo(doc.page.width - doc.page.margins.right, y).stroke();
+      doc.moveDown(yPad/14);
+    }
+    function kv(label, value) {
+      doc.fillColor(COLOR.muted).font("Helvetica").fontSize(10).text(label, {continued:true});
+      doc.fillColor(COLOR.primary).font("Helvetica-Bold").fontSize(11).text(` ${value ?? "-"}`);
+    }
+    function badge(text, type="muted") {
+      const bg = type === "good" ? "#dcfce7" : type === "bad" ? "#fee2e2" : type === "warn" ? "#fef3c7" : "#e5e7eb";
+      const fg = type === "good" ? COLOR.good : type === "bad" ? COLOR.bad : type === "warn" ? COLOR.warn : COLOR.primary;
+      const x = doc.x, y = doc.y;
+      const padX = 6, padY = 3;
+      const w = doc.widthOfString(String(text)) + padX*2;
+      const h = doc.currentLineHeight() + padY*2;
+      doc.save().roundRect(x, y, w, h, 4).fill(bg).restore();
+      doc.fillColor(fg).text(text, x+padX, y+padY);
+      doc.moveDown(0.2);
+    }
+    function pageFooter() {
+      const range = doc.bufferedPageRange();
+      for (let i = 0; i < range.count; i++) {
+        doc.switchToPage(i);
+        const pageNum = i + 1;
+        const text = `ProgreSync · ${dayjs().format("DD/MM/YYYY HH:mm")} · Página ${pageNum} de ${range.count}`;
+        doc.font("Helvetica").fontSize(9).fillColor(COLOR.muted);
+        const w = doc.widthOfString(text);
+        doc.text(text, doc.page.width - doc.page.margins.right - w, doc.page.height - doc.page.margins.bottom + 15);
+      }
     }
 
-    drawRow(["Fecha", "Acción", "Campo", "Anterior", "Nuevo", "Autor"], true);
+    /* ========= Encabezado ========= */
+    // “logo” tipográfico simple (no requiere imagen)
+    doc.font("Helvetica-Bold").fontSize(22).fillColor(COLOR.primary).text("Progre", {continued:true});
+    doc.fillColor(COLOR.accent).text("Sync");
+    doc.moveDown(0.5);
+    doc.font("Helvetica-Bold").fontSize(16).fillColor(COLOR.primary).text("Reporte de historial de entrega");
+    hr(6);
+
+    // Fila izquierda/derecha
+    const leftX = doc.x; const colW = 280;
+    // Columna izquierda: metadatos
+    doc.fontSize(11).fillColor(COLOR.primary);
+    kv("Título:", header.titulo || "-");
+    kv("Estudiante:", `${header.estudiante_nombre || "-"} <${header.estudiante_email || "-"}>`);
+    kv("Archivo:", header.archivo || "-");
+    kv("Fecha de creación:", header.fecha ? dayjs(header.fecha).format("DD/MM/YYYY HH:mm") : "-");
+    kv("Exportado:", dayjs().format("DD/MM/YYYY HH:mm"));
+
+    // Columna derecha: Estado (badge)
+    doc.moveUp(5);
+    doc.x = leftX + colW + 20;
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(COLOR.primary).text("Estado actual:");
+    const stateMap = { aprobado: "good", en_revision: "warn", rechazado: "bad" };
+    badge((header.estado || "—"), stateMap[header.estado] || "muted");
+
+    hr(12);
+
+    // Descripción (si hay)
+    if ((header.descripcion || "").trim()) {
+      doc.font("Helvetica-Bold").fontSize(12).fillColor(COLOR.primary).text("Descripción");
+      doc.moveDown(0.2);
+      doc.font("Helvetica").fontSize(11).fillColor(COLOR.primary)
+        .text(String(header.descripcion), {align:"justify"});
+      hr(12);
+    }
+
+    /* ========= Tabla historial ========= */
+    doc.font("Helvetica-Bold").fontSize(13).fillColor(COLOR.primary).text("Historial de cambios");
+    doc.moveDown(0.5);
+
+    const columns = [
+      { key:"fecha",    label:"Fecha",    width:110 },
+      { key:"accion",   label:"Acción",   width:85  },
+      { key:"campo",    label:"Campo",    width:85  },
+      { key:"anterior", label:"Anterior", width:140 },
+      { key:"nuevo",    label:"Nuevo",    width:140 },
+      { key:"autor",    label:"Autor",    width:120 },
+    ];
+
+    function tableHeader() {
+      const y = doc.y;
+      doc.save().rect(doc.x-2, y-4, doc.page.width - doc.page.margins.left - doc.page.margins.right + 4, 22)
+        .fill("#f3f4f6").restore();
+      columns.forEach(col => {
+        doc.font("Helvetica-Bold").fontSize(10).fillColor(COLOR.primary)
+          .text(col.label, {continued:true, width:col.width});
+      });
+      doc.text(""); doc.moveDown(0.3);
+      hr(6);
+    }
+
+    function tableRow(row, zebra=false) {
+      const y = doc.y;
+      if (zebra) {
+        doc.save().rect(doc.x-2, y-3, doc.page.width - doc.page.margins.left - doc.page.margins.right + 4,
+          doc.currentLineHeight()+6).fill(COLOR.zebra).restore();
+      }
+      columns.forEach((col, i) => {
+        const txt = String(row[col.key] ?? "");
+        doc.font("Helvetica").fontSize(10).fillColor(COLOR.primary)
+          .text(txt, {continued: i !== columns.length-1, width: col.width});
+      });
+      doc.text("");
+    }
+
+    function ensureSpace(lines=1.4) {
+      // fuerza salto si quedamos sin espacio visual para otra fila + comentario
+      if (doc.y > doc.page.height - doc.page.margins.bottom - lines*14) doc.addPage();
+    }
+
+    tableHeader();
 
     if (!historial.length) {
-      drawRow(["(Sin eventos)", "", "", "", "", ""]);
+      tableRow({fecha:"—", accion:"—", campo:"—", anterior:"—", nuevo:"—", autor:"—"});
     } else {
-      historial.forEach(h => {
-        const fecha = h.fecha ? dayjs(h.fecha).format("DD/MM/YYYY HH:mm") : "-";
-        const accion = h.accion || "";
-        const campo = h.campo || "";
-        const anterior = h.valor_anterior || "";
-        const nuevo = h.valor_nuevo || "";
-        const autor = h.usuario_nombre
-          ? `${h.usuario_nombre} (${h.usuario_rol || ""})`
-          : (h.usuario_rol || "-");
-        drawRow([fecha, accion, campo, anterior, nuevo, autor]);
-        if (h.comentario) drawRow(["Comentario:", "", "", h.comentario, "", ""]);
+      historial.forEach((h, idx) => {
+        // Salto prudente entre filas si se llena la página
+        ensureSpace(3);
+        const row = {
+          fecha:  h.fecha ? dayjs(h.fecha).format("DD/MM/YYYY HH:mm") : "-",
+          accion: h.accion || "",
+          campo:  h.campo || "",
+          anterior: h.valor_anterior || "",
+          nuevo:    h.valor_nuevo || "",
+          autor:  h.usuario_nombre ? `${h.usuario_nombre} (${h.usuario_rol || ""})` : (h.usuario_rol || "-")
+        };
+        tableRow(row, idx % 2 === 1);
+
+        // Comentario asociado (ocupa toda la fila, debajo)
+        if ((h.comentario || "").trim()) {
+          ensureSpace(2);
+          doc.moveDown(0.15);
+          doc.font("Helvetica-Oblique").fontSize(10).fillColor(COLOR.muted)
+            .text(`Comentario: ${h.comentario}`, {width: doc.page.width - doc.page.margins.left - doc.page.margins.right});
+          doc.moveDown(0.2);
+        }
       });
     }
 
+    // Render pies de página
+    pageFooter();
     doc.end();
   } catch (err) {
     console.error("Error GET /api/entregas/:id/reporte.pdf:", err);
