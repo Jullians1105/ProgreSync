@@ -468,7 +468,16 @@ router.get("/:id/reporte.pdf", async (req, res) => {
       const padX = 6, padY = 3;
       const w = doc.widthOfString(String(text)) + padX*2;
       const h = doc.currentLineHeight() + padY*2;
-      doc.save().roundRect(x, y, w, h, 4).fill(bg).restore();
+
+      // Corrección: usar roundedRect (con fallback a rect)
+      doc.save();
+      if (typeof doc.roundedRect === "function") {
+        doc.roundedRect(x, y, w, h, 4).fill(bg);
+      } else {
+        doc.rect(x, y, w, h).fill(bg);
+      }
+      doc.restore();
+
       doc.fillColor(fg).text(text, x+padX, y+padY);
       doc.moveDown(0.2);
     }
