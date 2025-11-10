@@ -5,12 +5,10 @@ import bcrypt from "bcryptjs";
 
 const router = Router();
 
-/* ========== LISTAR ========== */
+/* ─ LISTAR: GET /usuarios?q=&estado= ─ */
 router.get("/", async (req, res, next) => {
   try {
     const { q = "", estado = "" } = req.query;
-
-    // Filtros: búsqueda por nombre/email y estado si viene
     const where = [];
     const params = [];
 
@@ -29,7 +27,6 @@ router.get("/", async (req, res, next) => {
       ${where.length ? "WHERE " + where.join(" AND ") : ""}
       ORDER BY id ASC
     `;
-
     const [rows] = await pool.query(sql, params);
     res.json(rows);
   } catch (err) {
@@ -38,63 +35,118 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-/* ========== CREAR ========== */
+/* ─ OBTENER POR ID: GET /usuarios/:id ─ */
+router.get("/:id", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const [rows] = await pool.query(
+      "SELECT id, nombre, email, rol, estado FROM usuarios WHERE id = ?",
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ detail: "Usuario no encontrado" });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("❌ Error obteniendo usuario:", err);
+    next(err);
+  }
+});
+
+/* ─ CREAR: POST /usuarios ─ */
 router.post("/", async (req, res, next) => {
   try {
-    const { nombre, email, rol, password } = req.body || {};
+    const { nombre, email, rol, password, estado = "activo" } = req.body || {};
     if (!nombre || !email || !rol || !password) {
       return res.status(400).json({ detail: "Faltan campos obligatorios" });
     }
     if (password.length < 8) {
       return res.status(400).json({ detail: "La contraseña debe tener al menos 8 caracteres" });
     }
-
-    // ¿ya existe email?
     const [exists] = await pool.query("SELECT id FROM usuarios WHERE email = ?", [email]);
     if (exists.length) return res.status(409).json({ detail: "El email ya está registrado" });
 
     const hash = await bcrypt.hash(password, 10);
-
     const [r] = await pool.query(
-      "INSERT INTO usuarios (nombre, email, password_hash, rol, estado) VALUES (?, ?, ?, ?, 'activo')",
-      [nombre, email, hash, rol]
+      "INSERT INTO usuarios (nombre, email, password_hash, rol, estado) VALUES (?, ?, ?, ?, ?)",
+      [nombre, email, hash, rol, estado]
     );
-
-    const nuevo = { id: r.insertId, nombre, email, rol, estado: "activo" };
-    res.status(201).json(nuevo);
+    res.status(201).json({ id: r.insertId, nombre, email, rol, estado });
   } catch (err) {
     console.error("❌ Error creando usuario:", err);
     next(err);
   }
 });
 
-/* ========== ACTUALIZAR ========== */
+/* ─ ACTUALIZAR: PUT /usuarios/:id ─ */
 router.put("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { nombre, email, rol } = req.body || {};
-    if (!nombre || !email || !rol) {
+    const { nombre, email, rol, estado, password } = req.body || {};
+
+    if (!nombre || !email || !rol || !estado) {
       return res.status(400).json({ detail: "Faltan campos obligatorios" });
     }
 
-    // evitar choque de email con otros usuarios
-    const [dup] = await pool.query("SELECT id FROM usuarios WHERE email = ? AND id <> ?", [email, id]);
+    // duplicado de email en otro usuario
+    const [dup] = await pool.query(
+      "SELECT id FROM usuarios WHERE email = ? AND id <> ?",
+      [email, id]
+    );
     if (dup.length) return res.status(409).json({ detail: "Ese email ya está usado por otro usuario" });
 
-    const [r] = await pool.query(
-      "UPDATE usuarios SET nombre = ?, email = ?, rol = ? WHERE id = ?",
-      [nombre, email, rol, id]
-    );
+    // existe?
+    const [ex] = await pool.query("SELECT id FROM usuarios WHERE id = ?", [id]);
+    if (!ex.length) return res.status(404).json({ detail: "Usuario no encontrado" });
 
-    if (!r.affectedRows) return res.status(404).json({ detail: "Usuario no encontrado" });
-    res.json({ id: Number(id), nombre, email, rol });
+    if (password && String(password).trim() !== "") {
+      if (String(password).length < 8) {
+        return res.status(400).json({ detail: "La contraseña debe tener al menos 8 caracteres" });
+      }
+      const hash = await bcrypt.hash(password, 10);
+      await pool.query(
+        "UPDATE usuarios SET nombre = ?, email = ?, rol = ?, estado = ?, password_hash = ? WHERE id = ?",
+        [nombre, email, rol, estado, hash, id]
+      );
+    } else {
+      await pool.query(
+        "UPDATE usuarios SET nombre = ?, email = ?, rol = ?, estado = ? WHERE id = ?",
+        [nombre, email, rol, estado, id]
+      );
+    }
+
+    const [rows] = await pool.query(
+      "SELECT id, nombre, email, rol, estado FROM usuarios WHERE id = ?",
+      [id]
+    );
+    res.json(rows[0]);
   } catch (err) {
     console.error("❌ Error actualizando usuario:", err);
     next(err);
   }
 });
 
-/* ========== ACTIVAR/DESACTIVAR ========== */
+/* ─ CAMBIAR ESTADO: PATCH /usuarios/:id/estado ─ */
+router.patch("/:id/estado", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { estado } = req.body || {};
+    if (!["activo", "inactivo"].includes(estado || "")) {
+      return res.status(400).json({ detail: "estado inválido" });
+    }
+    const [r] = await pool.query("UPDATE usuarios SET estado = ? WHERE id = ?", [estado, id]);
+    if (!r.affectedRows) return res.status(404).json({ detail: "Usuario no encontrado" });
+
+    const [rows] = await pool.query(
+      "SELECT id, nombre, email, rol, estado FROM usuarios WHERE id = ?",
+      [id]
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("❌ Error cambiando estado:", err);
+    next(err);
+  }
+});
+
+/* ─ Compatibilidad: /activar y /desactivar ─ */
 router.patch("/:id/activar", async (req, res, next) => {
   try {
     const { id } = req.params;

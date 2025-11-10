@@ -134,6 +134,54 @@
     <!-- ====== Fin Auditoría ====== -->
   </main>
 
+  <!-- Modal Usuario (Nuevo / Editar) -->
+  <div class="modal fade" id="modalUsuario" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form id="formUsuario">
+          <div class="modal-header">
+            <h5 class="modal-title">Usuario</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="uId" />
+            <div class="mb-2">
+              <label class="form-label">Nombre</label>
+              <input id="uNombre" class="form-control" required />
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Email</label>
+              <input id="uEmail" type="email" class="form-control" required />
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Rol</label>
+              <select id="uRol" class="form-select">
+                <option value="admin">admin</option>
+                <option value="docente">docente</option>
+                <option value="estudiante">estudiante</option>
+              </select>
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Estado</label>
+              <select id="uEstado" class="form-select">
+                <option value="activo">activo</option>
+                <option value="inactivo">inactivo</option>
+              </select>
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Contraseña (dejar vacío para no cambiar)</label>
+              <input id="uPass" type="password" class="form-control" />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -167,7 +215,7 @@
     }
 
     // 4) Auditoría
-    const API = `${API_BASE}/auditoria`;
+  const API = `${API_BASE}/auditoria`;
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
     const badge = (a) => a==="CREATE"?"success":a==="UPDATE"?"warning":a==="DELETE"?"danger":a==="LOGIN"?"primary":a==="LOGOUT"?"secondary":"dark";
 
@@ -230,54 +278,7 @@
     render();
   </script>
 
-  <!-- Lógica propia de gestión de usuarios (sin guard/sesión adentro para evitar duplicados) -->
-  <!-- Modal y formulario para crear/editar usuarios (utilizado por /admin/admin.js) -->
-  <div class="modal fade" id="modalForm" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="modalTitulo">Usuario</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-        </div>
-        <form id="formUsuario">
-          <div class="modal-body">
-            <input type="hidden" id="uid" />
-
-            <div class="mb-3">
-              <label class="form-label">Nombre</label>
-              <input id="nombre" class="form-control" required />
-            </div>
-
-            <div class="mb-3">
-              <label class="form-label">Email</label>
-              <input id="email" type="email" class="form-control" required />
-            </div>
-
-            <div class="mb-3">
-              <label class="form-label">Rol</label>
-              <select id="rol" class="form-select">
-                <option value="estudiante">estudiante</option>
-                <option value="docente">docente</option>
-                <option value="admin">admin</option>
-                <option value="empresa">empresa</option>
-              </select>
-            </div>
-
-            <div id="grpPass" class="mb-3">
-              <label class="form-label">Contraseña</label>
-              <input id="password" type="password" class="form-control" minlength="8" />
-              <div class="form-text">La contraseña debe tener al menos 8 caracteres.</div>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-            <button type="submit" class="btn btn-primary">Guardar</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-
+  <!-- Lógica propia de gestión de usuarios -->
   <script type="module" src="/admin/admin.js"></script>
 </body>
 </html>

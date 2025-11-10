@@ -14,6 +14,7 @@ import notificacionesRoutes from "./routes/notificaciones.routes.js";
 import historialRoutes from "./routes/historial.routes.js";
 import auditoriaRoutes from "./routes/auditoria.routes.js";
 import empresaRoutes from "./routes/empresa.routes.js";
+import usuariosRoutes from "./routes/usuarios.routes.js";
 import { auditMutatingRequests } from "./middlewares/audit.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -118,11 +119,16 @@ app.post("/login", async (req, res) => {
     }
 
     const [rows] = await pool.query(
-      "SELECT id, nombre, email, password_hash, rol FROM usuarios WHERE email = ? LIMIT 1",
+      "SELECT id, nombre, email, password_hash, rol, estado FROM usuarios WHERE email = ? LIMIT 1",
       [email]
     );
     const user = rows[0];
     if (!user) return res.status(401).json({ error: "Credenciales inválidas" });
+
+    // Bloquear si está inactivo
+    if (user.estado === "inactivo") {
+      return res.status(403).json({ error: "Usuario desactivado" });
+    }
 
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) return res.status(401).json({ error: "Credenciales inválidas" });
@@ -133,6 +139,7 @@ app.post("/login", async (req, res) => {
       email: user.email,
       rol: user.rol,
       role: user.rol, // compat
+      estado: user.estado,
     };
 
     return res.json({ ok: true, user: req.session.user });
@@ -146,7 +153,7 @@ app.post("/login", async (req, res) => {
 app.get("/me", (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: "No autenticado" });
   const u = req.session.user;
-  return res.json({ user: { ...u, rol: u.role } });
+  return res.json({ user: { ...u, rol: u.role, estado: u.estado } });
 });
 
 // Logout
@@ -161,68 +168,46 @@ app.post("/logout", (req, res) => {
    Roles helper
 ========================= */
 function requireRole(...rolesPermitidos) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     const user = req.session?.user;
     if (!user) return res.status(401).json({ error: "No autenticado" });
-    const rol = user.rol || user.role;
-    if (!rolesPermitidos.includes(rol)) {
-      return res.status(403).json({ error: "Sin permisos" });
+
+    try {
+      // Verificar estado actual en BD
+      const [rows] = await pool.query(
+        "SELECT estado, rol FROM usuarios WHERE id = ? LIMIT 1",
+        [user.id]
+      );
+      const dbUser = rows[0];
+      if (!dbUser) {
+        req.session.destroy(() => {});
+        return res.status(401).json({ error: "No autenticado" });
+      }
+
+      if (dbUser.estado === "inactivo") {
+        req.session.destroy(() => {});
+        return res.status(403).json({ error: "Usuario desactivado" });
+      }
+
+      const rol = dbUser.rol || user.rol || user.role;
+      if (!rolesPermitidos.includes(rol)) {
+        return res.status(403).json({ error: "Sin permisos" });
+      }
+
+      req.session.user.rol = rol;
+      req.session.user.estado = dbUser.estado;
+      next();
+    } catch (err) {
+      console.error("requireRole error:", err);
+      return res.status(500).json({ error: "Error de autorización" });
     }
-    next();
   };
 }
 
 /* =========================
-   Gestión de usuarios
+   Gestión de usuarios (router)
 ========================= */
-
-// Crear usuario (solo admin)
-app.post("/usuarios", requireRole("admin"), async (req, res) => {
-  try {
-    const nombre = req.body?.nombre ?? null;
-    const email = String(req.body?.email || "").trim().toLowerCase();
-    const password = String(req.body?.password || "");
-    const rol = String(req.body?.rol || "");
-
-    if (!email || !password || !rol) {
-      return res.status(400).json({ error: "email, password y rol son obligatorios" });
-    }
-
-    const rolesValidos = ["estudiante", "docente", "admin", "empresa"];
-    if (!rolesValidos.includes(rol)) {
-      return res.status(400).json({ error: "rol inválido" });
-    }
-
-    const [existe] = await pool.query("SELECT id FROM usuarios WHERE email = ? LIMIT 1", [email]);
-    if (existe.length) return res.status(409).json({ error: "El email ya está registrado" });
-
-    const hash = await bcrypt.hash(password, 12);
-    await pool.query(
-      "INSERT INTO usuarios (nombre, email, rol, password_hash) VALUES (?,?,?,?)",
-      [nombre, email, rol, hash]
-    );
-
-    return res.status(201).json({ ok: true });
-  } catch (err) {
-    console.error("Error creando usuario:", err);
-    return res.status(500).json({ error: "No se pudo crear el usuario" });
-  }
-});
-
-// Listar usuarios (solo admin)
-app.get("/usuarios", requireRole("admin"), async (_req, res) => {
-  try {
-    const [rows] = await pool.query(`
-      SELECT id, nombre, email, rol, estado
-      FROM usuarios
-      ORDER BY id ASC
-    `);
-    return res.json({ ok: true, usuarios: rows });
-  } catch (err) {
-    console.error("Error listando usuarios:", err);
-    return res.status(500).json({ error: "No se pudo obtener la lista de usuarios" });
-  }
-});
+app.use("/usuarios", requireRole("admin"), usuariosRoutes);
 
 /* =========================
    Archivos estáticos (uploads)
@@ -235,6 +220,8 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/api/entregas", entregasRoutes);
 app.use("/api/historial", historialRoutes);
 app.use("/auditoria", auditoriaRoutes);
+app.use("/api/notificaciones", notificacionesRoutes);
+app.use("/api/empresa", empresaRoutes);
 
 /* =========================
   Rutas de notificaciones

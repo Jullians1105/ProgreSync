@@ -1,7 +1,7 @@
 // /Admin/usuarios.js
 import { API_BASE } from "/guard.js";
 
-/* ========== Sesión y gate ========== */
+/* ========== Gate de sesión ========== */
 const SESSION = await window.SESION_PROMISE;
 if (!SESSION || SESSION.rol !== "admin") {
   alert("Acceso restringido: solo administradores.");
@@ -9,7 +9,7 @@ if (!SESSION || SESSION.rol !== "admin") {
   throw new Error("No admin");
 }
 
-// Mostrar quién soy (opcional)
+/* ========== Whoami (opcional) ========== */
 const whoami = document.getElementById("whoami");
 if (whoami && SESSION?.email && SESSION?.rol) {
   whoami.textContent = `${SESSION.email} · ${SESSION.rol}`;
@@ -25,18 +25,17 @@ const filtroEstado  = document.getElementById("filtroEstado");
 const btnNuevo      = document.getElementById("btnNuevo");
 const btnBuscar     = document.getElementById("btnBuscar");
 
+// Modal y campos (IDs según tu HTML)
+const modalEl   = document.getElementById("modalUsuario");
 const form      = document.getElementById("formUsuario");
-const modalEl   = document.getElementById("modalForm");
-const titulo    = document.getElementById("modalTitulo");
+const uId       = document.getElementById("uId");
+const uNombre   = document.getElementById("uNombre");
+const uEmail    = document.getElementById("uEmail");
+const uRol      = document.getElementById("uRol");
+const uEstado   = document.getElementById("uEstado");
+const uPass     = document.getElementById("uPass");
 
-const uid       = document.getElementById("uid");
-const nombre    = document.getElementById("nombre");
-const email     = document.getElementById("email");
-const rol       = document.getElementById("rol");
-const password  = document.getElementById("password");
-const grpPass   = document.getElementById("grpPass");
-
-// Bootstrap Modal (si existe)
+// Bootstrap Modal
 const modal = (window.bootstrap && modalEl) ? new bootstrap.Modal(modalEl) : null;
 
 /* ========== Utils ========== */
@@ -47,50 +46,56 @@ function flash(type, text) {
   flash._t = window.setTimeout(() => (msg.innerHTML = ""), 3500);
 }
 
+function setTitle(text) {
+  const t = modalEl?.querySelector(".modal-title");
+  if (t) t.textContent = text;
+}
+
+const esc = (s) =>
+  String(s ?? "").replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+  );
+
 function rowTemplate(u) {
   const estado = (u.estado || "").toLowerCase();
-  const badgeEstado = estado === "activo"
-    ? `<span class="badge text-bg-success">activo</span>`
-    : `<span class="badge text-bg-danger">inactivo</span>`;
+  const badgeEstado =
+    estado === "activo"
+      ? `<span class="badge text-bg-success">activo</span>`
+      : `<span class="badge text-bg-secondary">inactivo</span>`;
 
-  const rolTxt = u.rol ?? "—";
+  const actionButtons = estado === "activo"
+    ? `<button class="btn btn-outline-danger" data-off="${esc(u.id)}" title="Desactivar">Desactivar</button>`
+    : `<button class="btn btn-outline-success" data-on="${esc(u.id)}" title="Activar">Activar</button>`;
+
   return `
     <tr>
-      <td>${u.id ?? "—"}</td>
-      <td>${u.nombre ?? "—"}</td>
-      <td>${u.email ?? "—"}</td>
-      <td><span class="badge text-bg-secondary">${rolTxt}</span></td>
+      <td>${esc(u.id ?? "—")}</td>
+      <td>${esc(u.nombre ?? "—")}</td>
+      <td>${esc(u.email ?? "—")}</td>
+      <td><span class="badge text-bg-secondary">${esc(u.rol ?? "—")}</span></td>
       <td>${badgeEstado}</td>
       <td class="text-end">
-        <button class="btn btn-sm btn-outline-primary me-2" data-edit="${u.id}">
-          <i class="bi bi-pencil"></i> Editar
-        </button>
-        ${
-          estado === "activo"
-            ? `<button class="btn btn-sm btn-outline-danger" data-off="${u.id}">
-                 <i class="bi bi-person-dash"></i> Desactivar
-               </button>`
-            : `<button class="btn btn-sm btn-outline-success" data-on="${u.id}">
-                 <i class="bi bi-person-check"></i> Activar
-               </button>`
-        }
+        <div class="btn-group btn-group-sm">
+          <button class="btn btn-outline-primary" data-edit="${esc(u.id)}" title="Editar">
+            Editar
+          </button>
+          ${actionButtons}
+        </div>
       </td>
     </tr>
   `;
 }
 
-/* ========== Data ========== */
-// Cancelación de peticiones de lista si el usuario teclea rápido
+/* ========== Listado (con cancelación de peticiones) ========== */
 let listAbort = null;
 
 async function listar() {
   if (!grid) return;
 
-  // cancelar petición anterior si sigue en vuelo
   if (listAbort) listAbort.abort();
   listAbort = new AbortController();
 
-  grid.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Cargando…</td></tr>`;
+  grid.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">Cargando…</td></tr>`;
 
   const params = new URLSearchParams();
   const q = (buscar?.value || "").trim();
@@ -108,29 +113,26 @@ async function listar() {
     }
 
     const data = await res.json();
-    // ⬇️ NUEVO: soporta [ ... ] o { usuarios:[ ... ] }
     const lista = Array.isArray(data) ? data : (Array.isArray(data?.usuarios) ? data.usuarios : []);
 
     if (lista.length === 0) {
-      grid.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Sin resultados</td></tr>`;
+      grid.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">Sin resultados</td></tr>`;
       return;
     }
-    grid.innerHTML = lista.map(rowTemplate).join("");
+  grid.innerHTML = lista.map(rowTemplate).join("");
   } catch (e) {
-    if (e.name === "AbortError") return; // fue cancelada por otra búsqueda
-    grid.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Error al listar</td></tr>`;
+    if (e.name === "AbortError") return;
+    grid.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3">Error al listar</td></tr>`;
     flash("danger", e.message || "Error al listar");
   }
 }
 
-/* ========== Eventos UI ========== */
+/* ========== Buscar/Filtro ========== */
 btnBuscar?.addEventListener("click", listar);
 filtroEstado?.addEventListener("change", listar);
 
 if (buscar) {
-  // Enter para buscar
   buscar.addEventListener("keydown", (e) => { if (e.key === "Enter") listar(); });
-  // debounce en escritura
   let t = null;
   buscar.addEventListener("input", () => {
     clearTimeout(t);
@@ -138,95 +140,149 @@ if (buscar) {
   });
 }
 
+/* ========== Nuevo ========== */
 btnNuevo?.addEventListener("click", () => {
   if (!modal) return;
-  titulo.textContent = "Nuevo usuario";
-  uid.value = "";
-  nombre.value = "";
-  email.value = "";
-  rol.value = "docente";
-  password.value = "";
-  grpPass?.classList.remove("d-none"); // password visible/obligatorio al crear
+  form.reset();
+  form.dataset.mode = "nuevo";
+  form.dataset.id = "";
+  uId.value = "";
+  uEstado.value = "activo";
+  uPass.value = "";
+  setTitle("Nuevo usuario");
   modal.show();
 });
 
+/* ========== Delegación en la grilla (Editar / Activar / Desactivar) ========== */
 grid?.addEventListener("click", async (e) => {
   const btn = e.target.closest("button");
   if (!btn) return;
+
   const id = btn.dataset.edit || btn.dataset.off || btn.dataset.on;
   if (!id) return;
 
-  // Editar: prellenar
+  // EDITAR: precargar usando la fila (sin API) y, si existe, refinar con GET.
   if (btn.dataset.edit) {
-    const tr = btn.closest("tr");
-    if (!tr || !modal) return;
+    try {
+      // 1) Precarga inmediata desde la fila
+      const tr = btn.closest("tr");
+      const c = tr?.children || [];
+      const idTxt     = c[0]?.textContent?.trim() ?? id;
+      const nombreTxt = c[1]?.textContent?.trim() ?? "";
+      const emailTxt  = c[2]?.textContent?.trim() ?? "";
+      const rolTxt    = c[3]?.innerText?.trim() ?? "estudiante"; // badge → texto
+      const estTxt    = c[4]?.innerText?.trim().toLowerCase() ?? "activo";
 
-    uid.value    = id;
-    nombre.value = tr.children[1]?.textContent.trim() || "";
-    email.value  = tr.children[2]?.textContent.trim() || "";
-    // la celda 3 es el badge; usar innerText para obtener solo el texto del rol
-    rol.value    = tr.children[3]?.innerText.trim() || "docente";
+      form.reset();
+      form.dataset.mode = "editar";
+      form.dataset.id = String(idTxt);
+      uId.value     = String(idTxt);
+      uNombre.value = nombreTxt;
+      uEmail.value  = emailTxt;
+      uRol.value    = rolTxt;
+      uEstado.value = (estTxt === "activo" || estTxt === "inactivo") ? estTxt : "activo";
+      uPass.value   = ""; // opcional en edición
 
-    password.value = "";
-    grpPass?.classList.add("d-none"); // no se cambia password aquí
-    titulo.textContent = `Editar usuario #${id}`;
-    modal.show();
+  setTitle(`Editar usuario #${idTxt}`);
+      modal?.show();
+
+      // 2) Intento de GET para datos “fresh” (si tu backend lo soporta)
+      try {
+  const res = await fetch(`${API}/${id}`, { credentials: "include" });
+        if (res.ok) {
+          const u = await res.json();
+          uNombre.value = u.nombre ?? uNombre.value;
+          uEmail.value  = u.email ?? uEmail.value;
+          uRol.value    = u.rol ?? uRol.value;
+          uEstado.value = u.estado ?? uEstado.value;
+        }
+        // Si 404, lo ignoramos; ya cargamos desde la fila
+      } catch { /* ignorar errores de red aquí */ }
+
+    } catch (err) {
+      console.error(err);
+      flash("danger", err.message || "No se pudo abrir el editor");
+    }
     return;
   }
 
-  // Desactivar
+  // DESACTIVAR
   if (btn.dataset.off) {
     if (!confirm("¿Desactivar este usuario?")) return;
-    const res = await fetch(`${API}/${id}/desactivar`, { method: "PATCH", credentials: "include" });
-    if (res.ok) { flash("success", "Usuario desactivado"); listar(); }
-    else flash("danger", `No se pudo desactivar (HTTP ${res.status})`);
+    try {
+      // preferido: PATCH /usuarios/:id/estado
+  let r = await fetch(`${API}/${id}/estado`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ estado: "inactivo" })
+      });
+      if (r.status === 404) {
+        // fallback a rutas antiguas
+  r = await fetch(`${API}/${id}/desactivar`, { method: "PATCH", credentials: "include" });
+      }
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      flash("success", "Usuario desactivado");
+      listar();
+    } catch (e2) {
+      flash("danger", `No se pudo desactivar (${e2.message})`);
+    }
     return;
   }
 
-  // Activar
+  // ACTIVAR
   if (btn.dataset.on) {
-    const res = await fetch(`${API}/${id}/activar`, { method: "PATCH", credentials: "include" });
-    if (res.ok) { flash("success", "Usuario activado"); listar(); }
-    else flash("danger", `No se pudo activar (HTTP ${res.status})`);
+    try {
+  let r = await fetch(`${API}/${id}/estado`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ estado: "activo" })
+      });
+      if (r.status === 404) {
+  r = await fetch(`${API}/${id}/activar`, { method: "PATCH", credentials: "include" });
+      }
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      flash("success", "Usuario activado");
+      listar();
+    } catch (e2) {
+      flash("danger", `No se pudo activar (${e2.message})`);
+    }
     return;
   }
 });
 
-// Guardar (crear/editar)
+/* ========== Guardar (crear/editar) ========== */
 form?.addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  // Validación mínima en cliente
-  if (!nombre?.checkValidity() || !email?.checkValidity() || !rol?.value) {
+  // Validación mínima
+  if (!uNombre?.checkValidity() || !uEmail?.checkValidity() || !uRol?.value || !uEstado?.value) {
     form.reportValidity?.();
     return;
   }
-  const isEdit = !!uid.value;
+
+  const mode = form.dataset.mode || (uId.value ? "editar" : "nuevo");
+  const id   = form.dataset.id || uId.value;
 
   const payload = {
-    email:  email.value.trim(),
-    nombre: nombre.value.trim(),
-    rol:    rol.value
+    nombre: uNombre.value.trim(),
+    email:  uEmail.value.trim(),
+    rol:    uRol.value,
+    estado: uEstado.value
   };
+  // Incluir password solo si se escribió
+  if (uPass.value.trim()) payload.password = uPass.value.trim();
 
-  if (!isEdit) {
-    if (!password.value || password.value.length < 8) {
-      password?.focus();
-      flash("warning", "La contraseña debe tener al menos 8 caracteres.");
-      return;
-    }
-    payload.password = password.value;
-  }
-
-  const url = isEdit ? `${API}/${uid.value}` : API;
-  const method = isEdit ? "PUT" : "POST";
+  const url = mode === "editar" ? `${API}/${id}` : API;
+  const method = mode === "editar" ? "PUT" : "POST";
 
   try {
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      credentials: "include"
+      credentials: "include",
+      body: JSON.stringify(payload)
     });
 
     if (!res.ok) {
@@ -237,12 +293,12 @@ form?.addEventListener("submit", async (e) => {
     }
 
     modal?.hide();
-    flash("success", isEdit ? "Usuario actualizado" : "Usuario creado");
+    flash("success", mode === "editar" ? "Usuario actualizado" : "Usuario creado");
     listar();
   } catch (e) {
     flash("danger", e.message || "Error de red");
   }
 });
 
-/* ========== Inicial ========== */
+/* ========== Inicial ========== */
 listar();
