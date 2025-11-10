@@ -129,7 +129,12 @@
           <div id="historial-error" class="p-4 d-none text-danger">Error al cargar el historial.</div>
         </div>
         <div class="modal-footer">
-          <small class="text-muted">El historial es de solo lectura.</small>
+          <!-- === AÑADIDO: botón Exportar PDF === -->
+          <a id="btn-exportar-pdf" class="btn btn-outline-primary" target="_blank" rel="noopener">
+            Exportar PDF
+          </a>
+          <!-- ================================ -->
+          <small class="text-muted ms-2">El historial es de solo lectura.</small>
         </div>
       </div>
     </div>
@@ -166,6 +171,9 @@
       if (v === "rechazado") return "Rechazado";
       return "En revisión";
     };
+
+    // === AÑADIDO: id de la entrega abierta en el modal ===
+    let HIST_ENTREGA_ID = null;
 
     /* =================== Modal Historial =================== */
     function setHistorialState(state /* 'loading'|'ok'|'empty'|'error' */) {
@@ -216,6 +224,16 @@
     async function abrirModalHistorial(entregaId, titulo) {
       document.getElementById("modalHistorialLabel").textContent =
         `Historial: ${titulo || `Entrega #${entregaId}`}`;
+
+         // === AÑADIDOS: fija id y href del botón Exportar PDF ===
+      HIST_ENTREGA_ID = entregaId;
+      const btnPDF = document.getElementById("btn-exportar-pdf");
+      if (btnPDF) {
+        // Usa el origen del backend (http://localhost:8000)
+        btnPDF.href = `${API_ORIGIN}/api/entregas/${encodeURIComponent(entregaId)}/reporte.pdf`;
+      }
+      // =======================================================
+
 
       setHistorialState("loading");
       document.getElementById("historial-lista").innerHTML = "";
@@ -291,7 +309,7 @@
       const dHasta = hasta ? new Date(hasta + "T23:59:59") : null;
 
       const pV = CACHE.pendientes.filter(x => pasaFiltro({ ...x, _seccion: "en_revision" }, selEstado, dDesde, dHasta)).length;
-      const aV = CACHE.aprobadas.filter(x => pasaFiltro({ ...x, _seccion: "aprobado"    }, selEstado, dDesde, dHasta)).length;
+      const aV = CACHE.aprobadas.filter(x  => pasaFiltro({ ...x, _seccion: "aprobado"    }, selEstado, dDesde, dHasta)).length;
       const rV = CACHE.rechazadas.filter(x => pasaFiltro({ ...x, _seccion: "rechazado"   }, selEstado, dDesde, dHasta)).length;
 
       const pT = CACHE.pendientes.length;
