@@ -385,7 +385,7 @@ router.patch("/:id/estado", async (req, res) => {
   }
 });
 
-/* ────────────────────── Exportar PDF del historial (bonito) ──────────────────────
+/* ────────────────────── Exportar PDF bonito (layout apilado) ──────────────────────
    GET /api/entregas/:id/reporte.pdf
 */
 router.get("/:id/reporte.pdf", async (req, res) => {
@@ -413,11 +413,11 @@ router.get("/:id/reporte.pdf", async (req, res) => {
          LEFT JOIN usuarios u ON u.id = h.usuario_id
         WHERE h.entrega_id = ?
         ORDER BY h.fecha DESC
-        LIMIT 2000`,
+        LIMIT 3000`,
       [entregaId]
     );
 
-    // 3) Nombre del archivo (usa helper saneado)
+    // 3) Nombre archivo
     const base = sanitizeFilename(header.titulo || `entrega_${entregaId}`);
     const stamp = dayjs().format("YYYY-MM-DD_HH-mm");
     const filename = `${base}__${stamp}.pdf`;
@@ -425,7 +425,7 @@ router.get("/:id/reporte.pdf", async (req, res) => {
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
-    // 4) Generar PDF con estilo –– A4 horizontal
+    // 4) PDF (en horizontal)
     const doc = new PDFDocument({
       size: "A4",
       layout: "landscape",
@@ -439,177 +439,174 @@ router.get("/:id/reporte.pdf", async (req, res) => {
     });
     doc.pipe(res);
 
-    /* ========= helpers de estilo ========= */
     const COLOR = {
-      primary: "#1f2937",  // gris oscuro
-      accent:  "#f59e0b",  // naranja
-      muted:   "#6b7280",  // gris medio
-      good:    "#16a34a",  // verde
-      warn:    "#f59e0b",  // naranja
-      bad:     "#dc2626",  // rojo
-      zebra:   "#f8fafc"
+      primary: "#1f2937",
+      accent:  "#f59e0b",
+      muted:   "#6b7280",
+      good:    "#16a34a",
+      warn:    "#f59e0b",
+      bad:     "#dc2626",
+      band:    "#f3f4f6",
     };
 
-    function kv(label, value) {
-      // más interlineado entre pares clave/valor
-      doc.fillColor(COLOR.muted).font("Helvetica").fontSize(10).text(label, {continued:true});
-      doc.fillColor(COLOR.primary).font("Helvetica-Bold").fontSize(11).text(` ${value ?? "-"}`);
-      doc.moveDown(0.25);
-    }
-    function badge(text, type="muted") {
-      const bg = type === "good" ? "#dcfce7" : type === "bad" ? "#fee2e2" : type === "warn" ? "#fef3c7" : "#e5e7eb";
-      const fg = type === "good" ? COLOR.good : type === "bad" ? COLOR.bad : type === "warn" ? COLOR.warn : COLOR.primary;
-      const x = doc.x, y = doc.y;
-      const padX = 6, padY = 3;
-      const w = doc.widthOfString(String(text)) + padX*2;
-      const h = doc.currentLineHeight() + padY*2;
-      doc.save().rect(x, y, w, h).fill(bg).restore();
-      doc.fillColor(fg).font("Helvetica-Bold").text(text, x+padX, y+padY);
-      // devolver altura usada
-      return h;
-    }
-    function pageFooter() {
-      const range = doc.bufferedPageRange();
-      for (let i = 0; i < range.count; i++) {
-        doc.switchToPage(i);
-        const pageNum = i + 1;
-        const text = `ProgreSync · ${dayjs().format("DD/MM/YYYY HH:mm")} · Página ${pageNum} de ${range.count}`;
-        doc.font("Helvetica").fontSize(9).fillColor(COLOR.muted);
-        const w = doc.widthOfString(text);
-        doc.text(text, doc.page.width - doc.page.margins.right - w, doc.page.height - doc.page.margins.bottom + 10);
-      }
-    }
+    const CONTENT_W = doc.page.width - doc.page.margins.left - doc.page.margins.right;
 
-    /* ========= Encabezado ========= */
-    doc.font("Helvetica-Bold").fontSize(26).fillColor(COLOR.primary).text("Progre", {continued:true});
+    const writeKV = (label, value) => {
+      doc.fillColor(COLOR.muted).font("Helvetica").fontSize(11).text(label, { continued: true });
+      doc.fillColor(COLOR.primary).font("Helvetica-Bold").fontSize(11).text(` ${value ?? "-"}`);
+    };
+
+    const drawBadge = (text, type = "good") => {
+      const bg = type === "good" ? "#dcfce7" : type === "bad" ? "#fee2e2" : "#fef3c7";
+      const fg = type === "good" ? COLOR.good : type === "bad" ? COLOR.bad : COLOR.warn;
+      const padX = 6, padY = 3;
+      const x = doc.x, y = doc.y;
+      const w = doc.widthOfString(String(text)) + padX * 2;
+      const h = doc.currentLineHeight() + padY * 2;
+      doc.save().rect(x, y, w, h).fill(bg).restore();
+      doc.fillColor(fg).font("Helvetica-Bold").text(text, x + padX, y + padY);
+      doc.moveDown(0.2);
+    };
+
+    /* ========= Encabezado + metadatos ========= */
+    doc.font("Helvetica-Bold").fontSize(28).fillColor(COLOR.primary).text("Progre", { continued: true });
     doc.fillColor(COLOR.accent).text("Sync");
-    doc.moveDown(0.3);
-    doc.font("Helvetica-Bold").fontSize(16).fillColor(COLOR.primary).text("Reporte de historial de entrega");
+    doc.moveDown(0.2);
+    doc.font("Helvetica-Bold").fontSize(18).fillColor(COLOR.primary).text("Reporte de historial de entrega");
+    doc.moveDown(0.8);
+
+    // Bloque de metadatos (interlineado mayor)
+    writeKV("Título:", header.titulo || "-");            doc.moveDown(0.35);
+    writeKV("Estudiante:", `${header.estudiante_nombre || "-"} <${header.estudiante_email || "-"}>`); doc.moveDown(0.35);
+    writeKV("Archivo:", header.archivo || "-");          doc.moveDown(0.35);
+    writeKV("Fecha de creación:", header.fecha ? dayjs(header.fecha).format("DD/MM/YYYY HH:mm") : "-"); doc.moveDown(0.35);
+    writeKV("Exportado:", dayjs().format("DD/MM/YYYY HH:mm"));
+    doc.moveDown(1.0); // margen inferior del bloque
+
+    /* ========= Estado actual (debajo de Exportado) ========= */
+    doc.font("Helvetica-Bold").fontSize(12).fillColor(COLOR.primary).text("Estado actual:");
+    const stateMap = { aprobado: "good", en_revision: "warn", rechazado: "bad" };
+    drawBadge(header.estado || "—", stateMap[header.estado] || "warn");
     doc.moveDown(0.6);
 
-    // Dos columnas perfectamente alineadas
-    const yStart = doc.y;
-    const leftX = doc.page.margins.left;
-    const colGap = 26;
-    const leftW = (doc.page.width - doc.page.margins.left - doc.page.margins.right - colGap) * 0.58;
-    const rightX = leftX + leftW + colGap;
-    const rightW = (doc.page.width - doc.page.margins.left - doc.page.margins.right) - leftW - colGap;
+    /* ========= Descripción (debajo) ========= */
+    if ((header.descripcion || "").trim()) {
+      doc.font("Helvetica-Bold").fontSize(12).fillColor(COLOR.primary).text("Descripción");
+      doc.moveDown(0.15);
+      doc.font("Helvetica").fontSize(11).fillColor(COLOR.primary)
+        .text(String(header.descripcion), { align: "justify", width: CONTENT_W });
+      doc.moveDown(0.8);
+    }
 
-    // Columna izquierda
-    doc.x = leftX; doc.y = yStart;
-    kv("Título:", header.titulo || "-");
-    kv("Estudiante:", `${header.estudiante_nombre || "-"} <${header.estudiante_email || "-"}>`);
-    kv("Archivo:", header.archivo || "-");
-    kv("Fecha de creación:", header.fecha ? dayjs(header.fecha).format("DD/MM/YYYY HH:mm") : "-");
-    kv("Exportado:", dayjs().format("DD/MM/YYYY HH:mm"));
-    const yLeftEnd = doc.y;
-
-    // Columna derecha
-    doc.x = rightX; doc.y = yStart;
-    doc.fillColor(COLOR.primary).font("Helvetica-Bold").fontSize(12).text("Estado actual:");
-    doc.moveDown(0.25);
-    const stateMap = { aprobado: "good", en_revision: "warn", rechazado: "bad" };
-    const badgeH = badge((header.estado || "—"), stateMap[header.estado] || "muted");
-    doc.moveDown(0.5);
-    doc.font("Helvetica-Bold").fontSize(12).fillColor(COLOR.primary).text("Descripción");
-    doc.moveDown(0.2);
-    doc.font("Helvetica").fontSize(11).fillColor(COLOR.primary)
-      .text(String(header.descripcion || "—"), { width: rightW });
-    const yRightEnd = doc.y;
-
-    // Colocar cursor debajo del bloque más alto
-    doc.y = Math.max(yLeftEnd, yRightEnd) + 8;
-    doc.moveDown(0.4);
-
-    /* ========= Tabla historial ========= */
+    /* ========= Tabla historial (debajo) ========= */
     doc.font("Helvetica-Bold").fontSize(14).fillColor(COLOR.primary).text("Historial de cambios");
-    doc.moveDown(0.4);
+    doc.moveDown(0.35);
 
-    // Anchura imprimible
-    const availW = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-
-    // Columnas pensadas para horizontal (suma 742 aprox. en A4 landscape con margen 50)
+    // En horizontal disponemos de ~642pt de ancho. Distribución cómoda:
     const columns = [
-      { key:"fecha",    label:"Fecha",    width:120 },
-      { key:"accion",   label:"Acción",   width:100 },
-      { key:"campo",    label:"Campo",    width:100 },
-      { key:"anterior", label:"Anterior", width:140 },
-      { key:"nuevo",    label:"Nuevo",    width:120 }, // un poco más angosta
-      { key:"autor",    label:"Autor",    width:availW - (120+100+100+140+120) }, // resto para Autor (más ancha)
+      { key: "fecha",    label: "Fecha",    width: 110 },
+      { key: "accion",   label: "Acción",   width: 100 },
+      { key: "campo",    label: "Campo",    width: 90 },
+      { key: "anterior", label: "Anterior", width: 150 },
+      { key: "nuevo",    label: "Nuevo",    width: 150 },
+      { key: "autor",    label: "Autor",    width: CONTENT_W - (110 + 100 + 90 + 150 + 150) }, // resto para autor
     ];
 
-    // Encabezado con banda gris
-    const headerY = doc.y;
-    doc.save()
-      .rect(doc.x - 2, headerY - 3, availW + 4, 20)
-      .fill("#f3f4f6")
-      .restore();
-    columns.forEach((col, i) => {
-      doc.font("Helvetica-Bold").fontSize(10).fillColor(COLOR.primary)
-        .text(col.label, doc.x + columns.slice(0, i).reduce((a, c) => a + c.width, 0), headerY - 1, {
-          width: col.width
-        });
-    });
-    doc.y = headerY + 20;
+    const tableX = doc.x;
+    const headerHeight = 18;
 
-    function ensureSpace(extraLines = 2) {
-      const room = doc.page.height - doc.page.margins.bottom - doc.y;
-      if (room < (extraLines * 14)) {
-        doc.addPage();
-      }
-    }
-
-    function tableRow(row, zebra=false) {
-      ensureSpace(3);
-      const rowY = doc.y;
-      if (zebra) {
-        doc.save()
-          .rect(doc.x - 2, rowY - 2, availW + 4, 18)
-          .fill(COLOR.zebra)
-          .restore();
-      }
-      columns.forEach((col, i) => {
-        const txt = String(row[col.key] ?? "");
-        doc.font("Helvetica").fontSize(10).fillColor(COLOR.primary)
-          .text(txt, doc.x + columns.slice(0, i).reduce((a, c) => a + c.width, 0), rowY, {
-            width: col.width
-          });
+    const printTableHeader = () => {
+      const y = doc.y;
+      doc.save()
+        .rect(tableX - 2, y - 3, CONTENT_W + 4, headerHeight)
+        .fill(COLOR.band)
+        .restore();
+      columns.forEach((c, i) => {
+        doc.font("Helvetica-Bold").fontSize(10).fillColor(COLOR.primary)
+          .text(c.label, tableX + columns.slice(0, i).reduce((a, b) => a + b.width, 0), y, { width: c.width });
       });
-      // ajustar y a la altura consumida de la fila
-      const heights = columns.map(col =>
-        doc.heightOfString(String(row[col.key] ?? ""), { width: col.width })
-      );
-      const rowH = Math.max(...heights, 12) + 6;
-      doc.y = rowY + rowH;
-    }
+      doc.moveDown(1.1);
+    };
+
+    const ensureSpace = (rowsNeeded = 3) => {
+      const bottom = doc.page.height - doc.page.margins.bottom;
+      if (doc.y > bottom - rowsNeeded * 14) {
+        doc.addPage();
+        // Repetimos título de sección en nueva página
+        doc.font("Helvetica-Bold").fontSize(14).fillColor(COLOR.primary).text("Historial de cambios");
+        doc.moveDown(0.35);
+        printTableHeader();
+      }
+    };
+
+    printTableHeader();
 
     if (!historial.length) {
-      tableRow({fecha:"—", accion:"—", campo:"—", anterior:"—", nuevo:"—", autor:"—"});
+      doc.font("Helvetica-Oblique").fontSize(11).fillColor(COLOR.muted).text("Sin movimientos registrados.", {
+        width: CONTENT_W,
+      });
     } else {
       historial.forEach((h, idx) => {
+        ensureSpace(3);
+
+        // Fila principal
         const row = {
           fecha:  h.fecha ? dayjs(h.fecha).format("DD/MM/YYYY HH:mm") : "-",
           accion: h.accion || "",
           campo:  h.campo || "",
           anterior: h.valor_anterior || "",
           nuevo:    h.valor_nuevo || "",
-          autor:  h.usuario_nombre ? `${h.usuario_nombre} (${h.usuario_rol || ""})` : (h.usuario_rol || "-")
+          autor:  h.usuario_nombre
+            ? `${h.usuario_nombre} (${h.usuario_rol || ""})`
+            : (h.usuario_rol || "-"),
         };
-        tableRow(row, idx % 2 === 1);
 
-        // Comentario asociado, ocupa ancho completo
+        const baseY = doc.y;
+        let rowHeight = 0;
+
+        // Calcular altura necesaria (wrap) sin pintar
+        columns.forEach((c, i) => {
+          const text = String(row[c.key] ?? "");
+          const hgt = doc.heightOfString(text, { width: c.width, align: "left" });
+          rowHeight = Math.max(rowHeight, hgt);
+        });
+
+        // Banda alterna
+        if (idx % 2 === 1) {
+          doc.save().rect(tableX - 2, baseY - 2, CONTENT_W + 4, rowHeight + 4).fill("#f8fafc").restore();
+        }
+
+        // Pintar celdas
+        columns.forEach((c, i) => {
+          const text = String(row[c.key] ?? "");
+          const x = tableX + columns.slice(0, i).reduce((a, b) => a + b.width, 0);
+          doc.font("Helvetica").fontSize(10).fillColor(COLOR.primary)
+            .text(text, x, baseY, { width: c.width });
+        });
+
+        // Avanzar a la siguiente fila
+        doc.y = baseY + rowHeight + 4;
+
+        // Comentario (si existe)
         if ((h.comentario || "").trim()) {
           ensureSpace(2);
-          doc.moveDown(0.15);
           doc.font("Helvetica-Oblique").fontSize(10).fillColor(COLOR.muted)
-            .text(`Comentario: ${h.comentario}`, { width: availW });
-          doc.moveDown(0.2);
+            .text(`Comentario: ${h.comentario}`, tableX, doc.y, { width: CONTENT_W });
+          doc.moveDown(0.4);
         }
       });
     }
 
-    // Pie de página
-    pageFooter();
+    // Numeración de páginas
+    const range = doc.bufferedPageRange();
+    for (let i = 0; i < range.count; i++) {
+      doc.switchToPage(i);
+      const pageNum = `${i + 1} / ${range.count}`;
+      doc.font("Helvetica").fontSize(9).fillColor(COLOR.muted);
+      const w = doc.widthOfString(pageNum);
+      doc.text(pageNum, doc.page.width - doc.page.margins.right - w, doc.page.height - doc.page.margins.bottom + 10);
+    }
+
     doc.end();
   } catch (err) {
     console.error("Error GET /api/entregas/:id/reporte.pdf:", err);
