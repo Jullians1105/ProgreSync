@@ -1,4 +1,4 @@
-// /Admin/usuarios.js
+// /admin/admin.js
 import { API_BASE } from "/guard.js";
 
 /* ========== Gate de sesión ========== */
@@ -34,6 +34,12 @@ const uEmail    = document.getElementById("uEmail");
 const uRol      = document.getElementById("uRol");
 const uEstado   = document.getElementById("uEstado");
 const uPass     = document.getElementById("uPass");
+
+
+// agregar casilla de telefono 
+const uTelefono = document.getElementById("uTelefono");
+
+
 
 // Bootstrap Modal
 const modal = (window.bootstrap && modalEl) ? new bootstrap.Modal(modalEl) : null;
@@ -72,6 +78,12 @@ function rowTemplate(u) {
       <td>${esc(u.id ?? "—")}</td>
       <td>${esc(u.nombre ?? "—")}</td>
       <td>${esc(u.email ?? "—")}</td>
+
+
+      <!-- columna telefono -->
+      <td>${esc(u.telefono ?? "—")}</td>
+
+
       <td><span class="badge text-bg-secondary">${esc(u.rol ?? "—")}</span></td>
       <td>${badgeEstado}</td>
       <td class="text-end">
@@ -95,7 +107,7 @@ async function listar() {
   if (listAbort) listAbort.abort();
   listAbort = new AbortController();
 
-  grid.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">Cargando…</td></tr>`;
+  grid.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Cargando…</td></tr>`;
 
   const params = new URLSearchParams();
   const q = (buscar?.value || "").trim();
@@ -116,13 +128,13 @@ async function listar() {
     const lista = Array.isArray(data) ? data : (Array.isArray(data?.usuarios) ? data.usuarios : []);
 
     if (lista.length === 0) {
-      grid.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">Sin resultados</td></tr>`;
+      grid.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Sin resultados</td></tr>`;
       return;
     }
-  grid.innerHTML = lista.map(rowTemplate).join("");
+    grid.innerHTML = lista.map(rowTemplate).join("");
   } catch (e) {
     if (e.name === "AbortError") return;
-    grid.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3">Error al listar</td></tr>`;
+    grid.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-3">Error al listar</td></tr>`;
     flash("danger", e.message || "Error al listar");
   }
 }
@@ -149,6 +161,9 @@ btnNuevo?.addEventListener("click", () => {
   uId.value = "";
   uEstado.value = "activo";
   uPass.value = "";
+
+  // Telefono, celda vacia
+  if (uTelefono) uTelefono.value = "";
   setTitle("Nuevo usuario");
   modal.show();
 });
@@ -167,37 +182,45 @@ grid?.addEventListener("click", async (e) => {
       // 1) Precarga inmediata desde la fila
       const tr = btn.closest("tr");
       const c = tr?.children || [];
-      const idTxt     = c[0]?.textContent?.trim() ?? id;
-      const nombreTxt = c[1]?.textContent?.trim() ?? "";
-      const emailTxt  = c[2]?.textContent?.trim() ?? "";
-      const rolTxt    = c[3]?.innerText?.trim() ?? "estudiante"; // badge → texto
-      const estTxt    = c[4]?.innerText?.trim().toLowerCase() ?? "activo";
+      const idTxt       = c[0]?.textContent?.trim() ?? id;
+      const nombreTxt   = c[1]?.textContent?.trim() ?? "";
+      const emailTxt    = c[2]?.textContent?.trim() ?? "";
+      // Telefono 
+      const telefonoTxt = c[3]?.textContent?.trim() ?? "";
+      const rolTxt      = c[4]?.innerText?.trim() ?? "estudiante"; // badge → texto
+      const estTxt      = c[5]?.innerText?.trim().toLowerCase() ?? "activo";
 
       form.reset();
       form.dataset.mode = "editar";
       form.dataset.id = String(idTxt);
-      uId.value     = String(idTxt);
-      uNombre.value = nombreTxt;
-      uEmail.value  = emailTxt;
-      uRol.value    = rolTxt;
-      uEstado.value = (estTxt === "activo" || estTxt === "inactivo") ? estTxt : "activo";
-      uPass.value   = ""; // opcional en edición
+      uId.value       = String(idTxt);
+      uNombre.value   = nombreTxt;
+      uEmail.value    = emailTxt;
+      // Telefono 
+      if (uTelefono) uTelefono.value = telefonoTxt;
+      uRol.value      = rolTxt;
+      uEstado.value   = (estTxt === "activo" || estTxt === "inactivo") ? estTxt : "activo";
+      uPass.value     = ""; // opcional en edición
 
-  setTitle(`Editar usuario #${idTxt}`);
+      setTitle(`Editar usuario #${idTxt}`);
       modal?.show();
 
       // 2) Intento de GET para datos “fresh” (si tu backend lo soporta)
       try {
-  const res = await fetch(`${API}/${id}`, { credentials: "include" });
+        const res = await fetch(`${API}/${id}`, { credentials: "include" });
         if (res.ok) {
           const u = await res.json();
-          uNombre.value = u.nombre ?? uNombre.value;
-          uEmail.value  = u.email ?? uEmail.value;
-          uRol.value    = u.rol ?? uRol.value;
-          uEstado.value = u.estado ?? uEstado.value;
+          uNombre.value     = u.nombre   ?? uNombre.value;
+          uEmail.value      = u.email    ?? uEmail.value;
+          // pregunta si telefono tiene un valor
+          if (uTelefono) uTelefono.value = u.telefono ?? uTelefono.value;
+          uRol.value        = u.rol      ?? uRol.value;
+          uEstado.value     = u.estado   ?? uEstado.value;
         }
         // Si 404, lo ignoramos; ya cargamos desde la fila
-      } catch { /* ignorar errores de red aquí */ }
+      } catch {
+        /* ignorar errores de red aquí */
+      }
 
     } catch (err) {
       console.error(err);
@@ -211,7 +234,7 @@ grid?.addEventListener("click", async (e) => {
     if (!confirm("¿Desactivar este usuario?")) return;
     try {
       // preferido: PATCH /usuarios/:id/estado
-  let r = await fetch(`${API}/${id}/estado`, {
+      let r = await fetch(`${API}/${id}/estado`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -219,9 +242,9 @@ grid?.addEventListener("click", async (e) => {
       });
       if (r.status === 404) {
         // fallback a rutas antiguas
-  r = await fetch(`${API}/${id}/desactivar`, { method: "PATCH", credentials: "include" });
+        r = await fetch(`${API}/${id}/desactivar`, { method: "PATCH", credentials: "include" });
       }
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       flash("success", "Usuario desactivado");
       listar();
     } catch (e2) {
@@ -233,16 +256,16 @@ grid?.addEventListener("click", async (e) => {
   // ACTIVAR
   if (btn.dataset.on) {
     try {
-  let r = await fetch(`${API}/${id}/estado`, {
+      let r = await fetch(`${API}/${id}/estado`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ estado: "activo" })
       });
       if (r.status === 404) {
-  r = await fetch(`${API}/${id}/activar`, { method: "PATCH", credentials: "include" });
+        r = await fetch(`${API}/${id}/activar`, { method: "PATCH", credentials: "include" });
       }
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       flash("success", "Usuario activado");
       listar();
     } catch (e2) {
@@ -266,10 +289,12 @@ form?.addEventListener("submit", async (e) => {
   const id   = form.dataset.id || uId.value;
 
   const payload = {
-    nombre: uNombre.value.trim(),
-    email:  uEmail.value.trim(),
-    rol:    uRol.value,
-    estado: uEstado.value
+    nombre:   uNombre.value.trim(),
+    email:    uEmail.value.trim(),
+    // en la parte de telefono agrega el valor o null sin espacios
+    telefono: uTelefono?.value.trim() || null,
+    rol:      uRol.value,
+    estado:   uEstado.value
   };
   // Incluir password solo si se escribió
   if (uPass.value.trim()) payload.password = uPass.value.trim();
@@ -295,10 +320,10 @@ form?.addEventListener("submit", async (e) => {
     modal?.hide();
     flash("success", mode === "editar" ? "Usuario actualizado" : "Usuario creado");
     listar();
-  } catch (e) {
-    flash("danger", e.message || "Error de red");
+  } catch (e2) {
+    flash("danger", e2.message || "Error de red");
   }
 });
 
-/* ========== Inicial ========== */
+/* ========== Inicial ========== */
 listar();

@@ -55,7 +55,13 @@
       <table class="table table-hover align-middle">
         <thead class="table-light">
           <tr>
-            <th>ID</th><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th>
+            <th>ID</th>
+            <th>Nombre</th>
+            <th>Email</th>
+            <!-- nueva columna de telefono -->
+            <th>Teléfono</th>
+            <th>Rol</th>
+            <th>Estado</th>
             <th class="text-end">Acciones</th>
           </tr>
         </thead>
@@ -153,6 +159,22 @@
               <label class="form-label">Email</label>
               <input id="uEmail" type="email" class="form-control" required />
             </div>
+
+<!-- Telefono -->
+            <div class="mb-2">
+              <label class="form-label">Teléfono</label>
+              <input 
+                id="uTelefono" 
+                type="tel" 
+                class="form-control"
+                placeholder="Ej: 3001234567"
+                maxlength="10"
+                pattern="^[0-9]{10}$"
+                title="Debe ser un número de 10 dígitos"
+              />
+            </div>
+
+
             <div class="mb-2">
               <label class="form-label">Rol</label>
               <select id="uRol" class="form-select">
@@ -215,7 +237,7 @@
     }
 
     // 4) Auditoría
-  const API = `${API_BASE}/auditoria`;
+    const API = `${API_BASE}/auditoria`;
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
     const badge = (a) => a==="CREATE"?"success":a==="UPDATE"?"warning":a==="DELETE"?"danger":a==="LOGIN"?"primary":a==="LOGOUT"?"secondary":"dark";
 
